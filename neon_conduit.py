@@ -34,7 +34,11 @@ PLAYER_D = 12.0     # how far ahead of the camera the sled sits
 CAM_H = 3.5         # camera height above the surface the sled is riding on
 FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the bottom
 FLOOR_Y = R * math.cos(FLOOR_A)
-OPEN_LIMIT = 1.3    # max wall angle in open half-pipe sections
+FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
+WALL_H = 2.2        # height of the upright kerbs lining open sections
+SLED_HW = 1.5
+SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
+SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed
 
 GATE_SEGS = 260
 START_TIME = 25.0
@@ -51,6 +55,15 @@ PALETTES = [
 
 BOOST_HW = 2.2      # half-widths, in world units
 BLOCK_HW = 3.0
+
+
+def floor_limit(half_width):
+    """Largest angle at which something this wide still sits wholly on the flat floor."""
+    return math.atan((FLOOR_HW - half_width - 0.2) / FLOOR_Y)
+
+
+# Open sections are a flat road between upright kerbs: nothing leaves the floor.
+OPEN_LIMIT = floor_limit(SLED_HW)
 
 FLOOR_COLS = ((58, 60, 74), (76, 79, 96))   # slate road, same in every zone
 
@@ -120,6 +133,10 @@ SIDE_R = [prof(a) for a in SIDE_A]
 SIDE_MID = [SIDE_A[k] + math.pi / SIDES for k in range(SIDES)]
 # Sides lit from below so the floor reads brighter than the ceiling.
 SIDE_LIGHT = [0.62 + 0.38 * math.cos(m) for m in SIDE_MID]
+FLOOR_SIDES = [s for s in range(SIDES) if abs(SIDE_MID[s]) < FLOOR_A]
+# Kerbs in open sections: (floor-edge ring vertex, index of the kerb-top point, x of the kerb).
+KERBS = ((FLOOR_SIDES[0], SIDES + 1, -FLOOR_HW), (FLOOR_SIDES[-1] + 1, SIDES + 2, FLOOR_HW))
+KERB_COLS = ((230, 200, 60), (150, 120, 40))
 
 
 def wrap(a):
@@ -148,6 +165,7 @@ class Audio:
                 "hit": self._noise(0.3, 0.45),
                 "boom": self._noise(0.22, 0.3),
                 "gate": self._sweep(500, 1300, 0.45, 0.3),
+                "scrape": self._noise(0.14, 0.22),
             }
             self.ok = True
         except pygame.error:
@@ -223,14 +241,21 @@ class Track:
         for i, j in enumerate(slots):
             z = (start + j) * SEG
             if i < n_boost:
+                lim = floor_limit(BOOST_HW)
                 if abs(c) > 0.05:
                     # The outside of the bend, where the sled gets thrown.
-                    a = -math.copysign(rng.uniform(0.7, 1.2), c)
+                    lo, hi = (0.5 * lim, lim) if is_open else (0.7, 1.2)
+                    a = -math.copysign(rng.uniform(lo, hi), c)
+                elif is_open:
+                    a = rng.uniform(-lim, lim)
                 else:
                     a = rng.uniform(-1.0, 1.0)
                 self.objects.append({"kind": "boost", "z": z, "a": snap(a, BOOST_HW)})
             elif i < n_boost + n_block:
-                if is_open or rng.random() < 0.7:
+                if is_open:
+                    lim = floor_limit(BLOCK_HW)
+                    a = rng.uniform(-lim, lim)
+                elif rng.random() < 0.7:
                     a = rng.uniform(-1.2, 1.2)
                 else:
                     a = rng.uniform(-math.pi, math.pi)
@@ -284,6 +309,8 @@ class Game:
         self.steer = 0.0
         self.t = 0.0
         self.paused = False
+        self.sparks = []
+        self.scrape_cd = 0.0
 
     # -------------------------------------------------------------- update
     @property
@@ -331,8 +358,13 @@ class Game:
             w = wrap(self.theta)
             if abs(w) > OPEN_LIMIT:
                 lim = math.copysign(OPEN_LIMIT, w)
-                self.theta += (lim - w) * min(1.0, 10.0 * dt)
+                # Slide down quickly if we arrived on a tube wall, then stop dead at the kerb.
+                w += (lim - w) * min(1.0, 10.0 * dt)
+                touching = abs(w - lim) < 0.1
+                self.theta = lim if touching else w
                 if self.omega * w > 0:
+                    if touching:
+                        self.scrape(dt, pz, math.copysign(1.0, w), abs(self.omega))
                     self.omega = 0.0
         self.roll += wrap(self.theta - self.roll) * min(1.0, 9.0 * dt)
         self.heading += tr.curv[seg] * self.speed * dt / SEG
@@ -360,6 +392,8 @@ class Game:
                 if z - pz < 320:
                     o["z"] = z = z + 0.5 * self.max_speed * dt
                 o["a"] = o["a0"] + o["amp"] * math.sin(self.t * o["w"] + o["ph"])
+                if tr.open[int(z // SEG)]:
+                    o["a"] = max(-OPEN_LIMIT, min(OPEN_LIMIT, o["a"]))
                 for b in self.bullets:
                     if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"]) < 3.0:
                         b["life"] = 0
@@ -397,6 +431,14 @@ class Game:
         for e in self.effects:
             e["age"] += dt
         self.effects = [e for e in self.effects if e["age"] < 0.45]
+        self.scrape_cd -= dt
+        for p in self.sparks:
+            p["age"] += dt
+            p["z"] += p["vz"] * dt
+            p["x"] += p["vx"] * dt
+            p["vh"] -= 30.0 * dt
+            p["h"] = max(0.0, p["h"] + p["vh"] * dt)
+        self.sparks = [p for p in self.sparks if p["age"] < p["life"]]
 
         self.score += int(self.speed * dt)
         self.shake = max(0.0, self.shake - dt)
@@ -407,6 +449,24 @@ class Game:
             self.time_left = 0.0
             self.best = max(self.best, self.score)
             self.state = "over"
+
+    def scrape(self, dt, pz, side, impact):
+        """Grinding along a kerb (side = -1 left, +1 right): bleeds speed and throws sparks."""
+        floor = SCRAPE_FLOOR * self.max_speed
+        if self.speed > floor:
+            self.speed = max(floor, self.speed - SCRAPE_DRAG * dt)
+        self.shake = max(self.shake, min(0.25, 0.07 + 0.15 * impact))
+        if self.scrape_cd <= 0:
+            self.scrape_cd = 0.11
+            self.audio.play("scrape")
+        vr = self.speed / BASE_SPEED
+        for _ in range(3 if impact > 0.5 else 2):
+            self.sparks.append({
+                "z": pz + random.uniform(-1.5, 3.5), "x": side * FLOOR_HW,
+                "h": random.uniform(0.2, 1.0), "vz": self.speed * random.uniform(0.35, 0.85),
+                "vx": -side * random.uniform(1.0, 9.0) * vr, "vh": random.uniform(2.0, 11.0),
+                "age": 0.0, "life": random.uniform(0.15, 0.4),
+            })
 
     def crash(self, keep_frac):
         self.speed *= keep_frac
@@ -488,6 +548,9 @@ class Game:
                 px = ox + SIDE_R[s] * SIDE_SIN[s]
                 py = oy + SIDE_R[s] * SIDE_COS[s]
                 pts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
+            for _, _, kx in KERBS:                  # kerb tops, used in open sections
+                px, py = ox + kx, oy + FLOOR_Y - WALL_H
+                pts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
             rings.append(pts)
 
         # bucket objects per segment so nearer walls correctly hide them
@@ -511,15 +574,11 @@ class Game:
                 r0, r1 = rings[i], rings[i + 1]
                 band = si // 2
                 gate_glow = si % GATE_SEGS in (0, GATE_SEGS - 1)
-                for s in range(SIDES):
-                    if is_open and abs(SIDE_MID[s]) > 1.5:
-                        continue
+                for s in (FLOOR_SIDES if is_open else range(SIDES)):
                     if abs(SIDE_MID[s]) < FLOOR_A:
                         c = FLOOR_COLS[band & 1]
                     else:
                         c = pal[(band + s) & 1]
-                    if is_open and abs(SIDE_MID[s]) > 1.2:
-                        c = (230, 200, 60)      # rail at the half-pipe lip
                     if gate_glow:
                         c = (240, 240, 255)
                     lt = SIDE_LIGHT[s] * (1 - fog)
@@ -527,10 +586,26 @@ class Game:
                            int(c[1] * lt + FOG[1] * fog),
                            int(c[2] * lt + FOG[2] * fog))
                     polygon(scr, col, (r0[s], r0[s + 1], r1[s + 1], r1[s]))
+                if is_open:
+                    # Upright kerbs at the floor edges: too steep to ride up.
+                    c = (240, 240, 255) if gate_glow else KERB_COLS[band & 1]
+                    lt = 0.85 * (1 - fog)
+                    col = (int(c[0] * lt + FOG[0] * fog),
+                           int(c[1] * lt + FOG[1] * fog),
+                           int(c[2] * lt + FOG[2] * fog))
+                    for v, t, _ in KERBS:
+                        polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
             for o in buckets.get(base + i, ()):
                 self.draw_object(o, proj)
 
         self.draw_sled(proj)
+        for p in self.sparks:
+            q0 = proj(p["z"], 0.0, p["x"], p["h"])
+            q1 = proj(p["z"] + 1.6, 0.0, p["x"] + 0.02 * p["vx"], p["h"] + 0.02 * p["vh"])
+            if q0 and q1:
+                t = p["age"] / p["life"]
+                pygame.draw.line(scr, mix((255, 250, 200), (255, 110, 20), t), q0[:2], q1[:2],
+                                 max(1, int(q0[2] * 0.14 * (1 - 0.5 * t))))
         if self.flash > 0:
             veil = pygame.Surface((W, H))
             veil.fill((255, 60, 40))
@@ -588,8 +663,8 @@ class Game:
     def draw_sled(self, proj):
         scr = self.screen
         pz, a = self.cam_z + PLAYER_D, self.theta
-        rl = proj(pz - 1.5, a, -1.5, 0.25, True)
-        rr = proj(pz - 1.5, a, 1.5, 0.25, True)
+        rl = proj(pz - 1.5, a, -SLED_HW, 0.25, True)
+        rr = proj(pz - 1.5, a, SLED_HW, 0.25, True)
         nose = proj(pz + 4.5, a, 0.0, 0.45, True)
         fin = proj(pz - 1.5, a, -self.steer * 0.6, 1.6, True)
         if not (rl and rr and nose and fin):
