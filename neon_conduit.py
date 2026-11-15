@@ -36,6 +36,11 @@ FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the b
 FLOOR_Y = R * math.cos(FLOOR_A)
 FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
 WALL_H = 2.2        # height of the upright kerbs lining open sections
+OPEN_CHANCE = 0.25  # chance that the next stretch of track is an open run
+OPEN_RUN = (2, 4)   # sections chained into one open run
+WIDE_CHANCE = 0.5   # chance that an open run widens out
+WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
+WIDE_TAPER = 20     # segments over which the kerbs splay out and back in
 SLED_HW = 1.5
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed
@@ -57,19 +62,23 @@ BOOST_HW = 2.2      # half-widths, in world units
 BLOCK_HW = 3.0
 
 
-def floor_limit(half_width):
-    """Largest angle at which something this wide still sits wholly on the flat floor."""
-    return math.atan((FLOOR_HW - half_width - 0.2) / FLOOR_Y)
+def floor_limit(half_width, hw=None):
+    """Largest angle at which something this wide still sits wholly on a floor of half-width hw.
 
-
-# Open sections are a flat road between upright kerbs: nothing leaves the floor.
-OPEN_LIMIT = floor_limit(SLED_HW)
+    Open sections are a flat road between upright kerbs, so nothing there goes past this.
+    """
+    if hw is None:
+        hw = FLOOR_HW
+    return math.atan((hw - half_width - 0.2) / FLOOR_Y)
 
 FLOOR_COLS = ((58, 60, 74), (76, 79, 96))   # slate road, same in every zone
 
 SIDE_A = [-math.pi + 2 * math.pi * k / SIDES for k in range(SIDES + 1)]
 SIDE_SIN = [math.sin(a) for a in SIDE_A]
 SIDE_COS = [math.cos(a) for a in SIDE_A]
+
+
+FLAT_MAX = 1.4      # angles are clamped here when mapped onto an open section's flat floor
 
 
 def prof(a):
@@ -83,9 +92,14 @@ def bank(a):
     return max(0.0, min(1.0, (abs(wrap(a)) - 0.8 * FLOOR_A) / 0.35))
 
 
-def lat_pos(a):
-    """Distance along the wall surface from the middle of the floor to angle a."""
+def lat_pos(a, flat=False):
+    """Distance along the surface from the middle of the floor to angle a.
+
+    flat: in an open section the floor carries on flat instead of curving up into the wall.
+    """
     w = wrap(a)
+    if flat:
+        return FLOOR_Y * math.tan(max(-FLAT_MAX, min(FLAT_MAX, w)))
     if abs(w) < FLOOR_A:
         return FLOOR_Y * math.tan(w)
     return math.copysign(FLOOR_Y * math.tan(FLOOR_A) + R * (abs(w) - FLOOR_A), w)
@@ -94,9 +108,9 @@ def lat_pos(a):
 PERIMETER = 2 * (FLOOR_Y * math.tan(FLOOR_A) + R * (math.pi - FLOOR_A))
 
 
-def lat_dist(a1, a2):
+def lat_dist(a1, a2, flat=False):
     """Sideways distance between two wall angles, in world units."""
-    d = abs(lat_pos(a1) - lat_pos(a2))
+    d = abs(lat_pos(a1, flat) - lat_pos(a2, flat))
     return min(d, PERIMETER - d)
 
 
@@ -110,21 +124,29 @@ def snap(a, half_width):
     return w
 
 
-def wall_xy(a, lat, h, rigid=False):
+def wall_xy(a, lat, h, rigid=False, flat=0.0):
     """Point in the tube cross-section: at wall angle a, lat units sideways, h above the surface.
 
     Fixed scenery follows the surface (flat on the floor, curved on the wall).
     Moving things are rigid: they use one local frame, which stays upright on
     the floor and turns smoothly to the wall normal past the corner.
+    flat: 1 in open sections, where the floor carries on flat past the tube's
+    corner; in between, rigid things blend from the tube frame to the flat one.
     """
     w = wrap(a)
+    if flat > 0.0 or abs(w) < FLOOR_A:
+        fx = FLOOR_Y * math.tan(max(-FLAT_MAX, min(FLAT_MAX, w))) + lat
+        fy = FLOOR_Y - h
+        if flat >= 1.0 or abs(w) < FLOOR_A and not rigid:
+            return fx, fy
     if rigid:
         r = prof(w)
         na = w * bank(w)
-        return (r * math.sin(w) + lat * math.cos(na) - h * math.sin(na),
-                r * math.cos(w) - lat * math.sin(na) - h * math.cos(na))
-    if abs(w) < FLOOR_A:
-        return FLOOR_Y * math.tan(w) + lat, FLOOR_Y - h
+        x = r * math.sin(w) + lat * math.cos(na) - h * math.sin(na)
+        y = r * math.cos(w) - lat * math.sin(na) - h * math.cos(na)
+        if flat > 0.0:
+            return x + (fx - x) * flat, y + (fy - y) * flat
+        return x, y
     a2 = w + lat / R
     return (R - h) * math.sin(a2), (R - h) * math.cos(a2)
 
@@ -134,8 +156,9 @@ SIDE_MID = [SIDE_A[k] + math.pi / SIDES for k in range(SIDES)]
 # Sides lit from below so the floor reads brighter than the ceiling.
 SIDE_LIGHT = [0.62 + 0.38 * math.cos(m) for m in SIDE_MID]
 FLOOR_SIDES = [s for s in range(SIDES) if abs(SIDE_MID[s]) < FLOOR_A]
-# Kerbs in open sections: (floor-edge ring vertex, index of the kerb-top point, x of the kerb).
-KERBS = ((FLOOR_SIDES[0], SIDES + 1, -FLOOR_HW), (FLOOR_SIDES[-1] + 1, SIDES + 2, FLOOR_HW))
+# Floor vertices across an open section, as fractions of its half-width (-1 .. 1).
+OPEN_X = [math.tan(SIDE_A[v]) / math.tan(FLOOR_A)
+          for v in range(FLOOR_SIDES[0], FLOOR_SIDES[-1] + 2)]
 KERB_COLS = ((230, 200, 60), (150, 120, 40))
 
 
@@ -204,22 +227,53 @@ class Track:
         self.curv = []
         self.pitch = []
         self.open = []
+        self.width = []            # floor half-width at the start of each segment
         self.objects = []          # dicts: kind, z, a, ...
         self.next_gate = GATE_SEGS
         self._section(30, 0.0, 0.0, False, 0, empty=True)
 
     def ensure(self, seg_index, level):
         while len(self.curv) < seg_index:
-            rng = self.rng
-            n = rng.randint(24, 56)
-            c = 0.0
-            if rng.random() < 0.72:
-                peak = min(0.55, 0.30 + 0.04 * level)
-                c = rng.uniform(0.14, peak) * rng.choice((-1, 1))
-            p = rng.uniform(-0.2, 0.2) if rng.random() < 0.5 else 0.0
-            self._section(n, c, p, rng.random() < 0.3, level)
+            # Never two open runs back to back: there is always tube in between.
+            if not self.open[-1] and self.rng.random() < OPEN_CHANCE:
+                self._open_run(level)
+            else:
+                self._section(*self._shape(level), False, level)
 
-    def _section(self, n, c, p, is_open, level, empty=False):
+    def hw_at(self, z):
+        """Floor half-width at depth z."""
+        f = z / SEG
+        i = int(f)
+        return self.width[i] + (self.width[i + 1] - self.width[i]) * (f - i)
+
+    def _shape(self, level):
+        """Length, peak curvature and peak pitch of a new section."""
+        rng = self.rng
+        n = rng.randint(24, 56)
+        c = 0.0
+        if rng.random() < 0.72:
+            peak = min(0.55, 0.30 + 0.04 * level)
+            c = rng.uniform(0.14, peak) * rng.choice((-1, 1))
+        p = rng.uniform(-0.2, 0.2) if rng.random() < 0.5 else 0.0
+        return n, c, p
+
+    def _open_run(self, level):
+        """Several open sections back to back; some runs splay out to a wider floor."""
+        rng = self.rng
+        shapes = [self._shape(level) for _ in range(rng.randint(*OPEN_RUN))]
+        total = sum(n for n, _, _ in shapes)
+        peak = rng.uniform(*WIDE_HW) if rng.random() < WIDE_CHANCE else FLOOR_HW
+        widths = []
+        for j in range(total):
+            # Tube width where the run meets the tube, easing out to the peak and back.
+            t = min(1.0, min(j, total - j) / WIDE_TAPER)
+            widths.append(FLOOR_HW + (peak - FLOOR_HW) * t * t * (3 - 2 * t))
+        j = 0
+        for n, c, p in shapes:
+            self._section(n, c, p, True, level, widths=widths[j:j + n])
+            j += n
+
+    def _section(self, n, c, p, is_open, level, empty=False, widths=None):
         rng = self.rng
         start = len(self.curv)
         for j in range(n):
@@ -227,6 +281,7 @@ class Track:
             self.curv.append(c * env)
             self.pitch.append(p * env)
             self.open.append(is_open)
+            self.width.append(widths[j] if widths else FLOOR_HW)
         # Checkpoint gates at fixed intervals.
         while self.next_gate < start + n:
             self.objects.append({"kind": "gate", "z": self.next_gate * SEG})
@@ -236,12 +291,15 @@ class Track:
 
         n_boost = rng.randint(1, 2)
         n_block = rng.randint(0, min(4, 1 + level // 2))
+        if widths and max(widths) > 1.3 * FLOOR_HW:
+            n_block += 1            # more room to dodge on a wide floor
         n_drone = rng.randint(0, min(3, 1 + level // 3))
         slots = rng.sample(range(3, n - 2), n_boost + n_block + n_drone)
         for i, j in enumerate(slots):
             z = (start + j) * SEG
+            hw = min(self.width[start + j], self.width[start + j + 2])
             if i < n_boost:
-                lim = floor_limit(BOOST_HW)
+                lim = floor_limit(BOOST_HW, hw)
                 if abs(c) > 0.05:
                     # The outside of the bend, where the sled gets thrown.
                     lo, hi = (0.5 * lim, lim) if is_open else (0.7, 1.2)
@@ -250,16 +308,16 @@ class Track:
                     a = rng.uniform(-lim, lim)
                 else:
                     a = rng.uniform(-1.0, 1.0)
-                self.objects.append({"kind": "boost", "z": z, "a": snap(a, BOOST_HW)})
+                self.objects.append({"kind": "boost", "z": z, "a": a if is_open else snap(a, BOOST_HW)})
             elif i < n_boost + n_block:
                 if is_open:
-                    lim = floor_limit(BLOCK_HW)
+                    lim = floor_limit(BLOCK_HW, hw)
                     a = rng.uniform(-lim, lim)
                 elif rng.random() < 0.7:
                     a = rng.uniform(-1.2, 1.2)
                 else:
                     a = rng.uniform(-math.pi, math.pi)
-                self.objects.append({"kind": "block", "z": z, "a": snap(a, BLOCK_HW)})
+                self.objects.append({"kind": "block", "z": z, "a": a if is_open else snap(a, BLOCK_HW)})
             else:
                 self.objects.append({
                     "kind": "drone", "z": z, "a0": rng.uniform(-0.9, 0.9),
@@ -310,6 +368,7 @@ class Game:
         self.t = 0.0
         self.paused = False
         self.sparks = []
+        self.flat = 0.0         # 0 in the tube, 1 on the flat floor of an open section
         self.scrape_cd = 0.0
 
     # -------------------------------------------------------------- update
@@ -348,23 +407,37 @@ class Game:
         # --- wall physics: steering, gravity, and the bend throwing you out
         vr = self.speed / BASE_SPEED
         # Gravity only pulls you back once you are up on the curved wall.
+        is_open = tr.open[seg]
+        hw = tr.hw_at(pz)
+        open_limit = floor_limit(SLED_HW, hw)
         w = abs(wrap(self.theta))
-        slope = max(0.0, min(1.0, (w - 0.8 * FLOOR_A) / 0.35))
+        # Switch to the flat-floor frame once in the open, but only after a sled
+        # that arrived up on a tube wall has slid down to the floor.
+        if not is_open:
+            self.flat = max(0.0, self.flat - 8.0 * dt)
+        elif w <= max(FLOOR_A, open_limit) + 0.02:
+            self.flat = min(1.0, self.flat + 8.0 * dt)
+        slope = bank(w) * (1.0 - self.flat)
         acc = (16.0 * steer - 14.0 * slope * math.sin(self.theta)
                - 24.0 * tr.curv[seg] * vr * vr - 3.5 * self.omega)
         self.omega += acc * dt
-        self.theta += self.omega * dt
-        if tr.open[seg]:
+        step = self.omega * dt
+        if w > FLOOR_A:
+            # Past the tube's corner a flat floor stretches the angle scale; keep
+            # the sideways speed what it is at the corner.
+            step *= 1.0 + self.flat * (2.0 * math.cos(min(w, FLAT_MAX)) ** 2 - 1.0)
+        self.theta += step
+        if is_open:
             w = wrap(self.theta)
-            if abs(w) > OPEN_LIMIT:
-                lim = math.copysign(OPEN_LIMIT, w)
+            if abs(w) > open_limit:
+                lim = math.copysign(open_limit, w)
                 # Slide down quickly if we arrived on a tube wall, then stop dead at the kerb.
                 w += (lim - w) * min(1.0, 10.0 * dt)
                 touching = abs(w - lim) < 0.1
                 self.theta = lim if touching else w
                 if self.omega * w > 0:
                     if touching:
-                        self.scrape(dt, pz, math.copysign(1.0, w), abs(self.omega))
+                        self.scrape(dt, pz, math.copysign(hw, w), abs(self.omega))
                     self.omega = 0.0
         self.roll += wrap(self.theta - self.roll) * min(1.0, 9.0 * dt)
         self.heading += tr.curv[seg] * self.speed * dt / SEG
@@ -388,29 +461,31 @@ class Game:
             if z < self.cam_z - 20:
                 continue
             alive = True
+            flat = kind != "gate" and tr.open[int(z // SEG)]
             if kind == "drone":
                 if z - pz < 320:
                     o["z"] = z = z + 0.5 * self.max_speed * dt
                 o["a"] = o["a0"] + o["amp"] * math.sin(self.t * o["w"] + o["ph"])
-                if tr.open[int(z // SEG)]:
-                    o["a"] = max(-OPEN_LIMIT, min(OPEN_LIMIT, o["a"]))
+                if flat:
+                    lim = floor_limit(1.0, tr.hw_at(z))
+                    o["a"] = max(-lim, min(lim, o["a"]))
                 for b in self.bullets:
-                    if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"]) < 3.0:
+                    if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"], flat) < 3.0:
                         b["life"] = 0
                         alive = False
                         self.score += 500
                         self.effects.append({"z": z, "a": o["a"], "age": 0.0})
                         self.audio.play("boom")
                         break
-                if alive and abs(z - pz) < 2.5 and lat_dist(o["a"], self.theta) < 3.2:
+                if alive and abs(z - pz) < 2.5 and lat_dist(o["a"], self.theta, flat) < 3.2:
                     alive = False
                     self.crash(0.5)
                     self.effects.append({"z": z, "a": o["a"], "age": 0.0})
             elif kind == "block":
-                if prev_pz < z <= pz and lat_dist(o["a"], self.theta) < BLOCK_HW + 1.2:
+                if prev_pz < z <= pz and lat_dist(o["a"], self.theta, flat) < BLOCK_HW + 1.2:
                     self.crash(0.3)
             elif kind == "boost":
-                if z <= pz <= z + 10 and lat_dist(o["a"], self.theta) < BOOST_HW + 1.0:
+                if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
                     if self.boost < 1.0:
                         self.audio.play("boost")
                         self.score += 100
@@ -450,8 +525,9 @@ class Game:
             self.best = max(self.best, self.score)
             self.state = "over"
 
-    def scrape(self, dt, pz, side, impact):
-        """Grinding along a kerb (side = -1 left, +1 right): bleeds speed and throws sparks."""
+    def scrape(self, dt, pz, kerb_x, impact):
+        """Grinding along the kerb at sideways position kerb_x: bleeds speed and throws sparks."""
+        side = math.copysign(1.0, kerb_x)
         floor = SCRAPE_FLOOR * self.max_speed
         if self.speed > floor:
             self.speed = max(floor, self.speed - SCRAPE_DRAG * dt)
@@ -462,7 +538,7 @@ class Game:
         vr = self.speed / BASE_SPEED
         for _ in range(3 if impact > 0.5 else 2):
             self.sparks.append({
-                "z": pz + random.uniform(-1.5, 3.5), "x": side * FLOOR_HW,
+                "z": pz + random.uniform(-1.5, 3.5), "x": kerb_x,
                 "h": random.uniform(0.2, 1.0), "vz": self.speed * random.uniform(0.35, 0.85),
                 "vx": -side * random.uniform(1.0, 9.0) * vr, "vh": random.uniform(2.0, 11.0),
                 "age": 0.0, "life": random.uniform(0.15, 0.4),
@@ -483,9 +559,9 @@ class Game:
 
         # Camera sits above the sled's spot on the surface, rolled to match it:
         # level on the floor, banked on the walls.
-        tilt = wrap(self.roll) * bank(self.roll)
+        tilt = wrap(self.roll) * bank(self.roll) * (1.0 - self.flat)
         cr, sr = math.cos(tilt), math.sin(tilt)
-        camx, camy = wall_xy(self.roll, 0.0, CAM_H, rigid=True)
+        camx, camy = wall_xy(self.roll, 0.0, CAM_H, rigid=True, flat=self.flat)
         ox_s = oy_s = 0
         if self.shake > 0:
             ox_s = random.uniform(-1, 1) * 22 * self.shake
@@ -525,20 +601,22 @@ class Game:
             t = f - i
             return rcx[i] + (rcx[i + 1] - rcx[i]) * t, rcy[i] + (rcy[i + 1] - rcy[i]) * t
 
-        def proj(z, a, lat=0.0, h=0.0, rigid=False):
-            """Screen point at depth z; see wall_xy for a / lat / h / rigid."""
+        def proj(z, a, lat=0.0, h=0.0, rigid=False, flat=None):
+            """Screen point at depth z; see wall_xy for a / lat / h / rigid / flat."""
+            if flat is None:
+                flat = 1.0 if tr.open[int(z // SEG)] else 0.0
             d = z - self.cam_z
             if d < NEAR:
                 return None
             ccx, ccy = centre(z)
-            wx, wy = wall_xy(a, lat, h, rigid)
+            wx, wy = wall_xy(a, lat, h, rigid, flat)
             px = ccx + wx - camx
             py = ccy + wy - camy
             k = focal / d
             return pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr), k
 
         # project ring vertices
-        rings = []
+        rings, orings = [], []
         for i in range(DRAW + 1):
             d = max(NEAR, (i - frac) * SEG)
             k = focal / d
@@ -548,10 +626,17 @@ class Game:
                 px = ox + SIDE_R[s] * SIDE_SIN[s]
                 py = oy + SIDE_R[s] * SIDE_COS[s]
                 pts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
-            for _, _, kx in KERBS:                  # kerb tops, used in open sections
-                px, py = ox + kx, oy + FLOOR_Y - WALL_H
-                pts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
             rings.append(pts)
+            # Open-section outline at this ring: floor vertices, then the two kerb tops.
+            hw = tr.width[base + i]
+            py = oy + FLOOR_Y
+            opts = [(pcx + k * ((ox + f * hw) * cr - py * sr), pcy + k * ((ox + f * hw) * sr + py * cr))
+                    for f in OPEN_X]
+            py -= WALL_H
+            for f in (-1.0, 1.0):
+                px = ox + f * hw
+                opts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
+            orings.append(opts)
 
         # bucket objects per segment so nearer walls correctly hide them
         buckets = {}
@@ -574,6 +659,11 @@ class Game:
                 r0, r1 = rings[i], rings[i + 1]
                 band = si // 2
                 gate_glow = si % GATE_SEGS in (0, GATE_SEGS - 1)
+                if is_open:
+                    r0, r1 = orings[i], orings[i + 1]
+                    off = FLOOR_SIDES[0]
+                else:
+                    off = 0
                 for s in (FLOOR_SIDES if is_open else range(SIDES)):
                     if abs(SIDE_MID[s]) < FLOOR_A:
                         c = FLOOR_COLS[band & 1]
@@ -585,7 +675,7 @@ class Game:
                     col = (int(c[0] * lt + FOG[0] * fog),
                            int(c[1] * lt + FOG[1] * fog),
                            int(c[2] * lt + FOG[2] * fog))
-                    polygon(scr, col, (r0[s], r0[s + 1], r1[s + 1], r1[s]))
+                    polygon(scr, col, (r0[s - off], r0[s - off + 1], r1[s - off + 1], r1[s - off]))
                 if is_open:
                     # Upright kerbs at the floor edges: too steep to ride up.
                     c = (240, 240, 255) if gate_glow else KERB_COLS[band & 1]
@@ -593,7 +683,8 @@ class Game:
                     col = (int(c[0] * lt + FOG[0] * fog),
                            int(c[1] * lt + FOG[1] * fog),
                            int(c[2] * lt + FOG[2] * fog))
-                    for v, t, _ in KERBS:
+                    nf = len(OPEN_X)
+                    for v, t in ((0, nf), (nf - 1, nf + 1)):
                         polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
             for o in buckets.get(base + i, ()):
                 self.draw_object(o, proj)
@@ -645,7 +736,12 @@ class Game:
                                     ((x - s, y), (x, y - s * 0.6), (x + s, y), (x, y + s * 0.6)))
                 pygame.draw.circle(scr, (255, 240, 200), (x, y), max(1, s * 0.3))
         elif kind == "gate":
-            pts = [proj(z, a, 0.0, 0.3) for a in SIDE_A]
+            if self.track.open[int(z // SEG)]:
+                # No tube to ring: a goalpost arch from kerb to kerb.
+                hw = self.track.hw_at(z)
+                pts = [proj(z, 0.0, x, h) for x, h in ((-hw, 0.0), (-hw, 9.0), (hw, 9.0), (hw, 0.0))]
+            else:
+                pts = [proj(z, a, 0.0, 0.3) for a in SIDE_A]
             if all(pts):
                 pygame.draw.lines(scr, (255, 255, 160), False, [p[:2] for p in pts],
                                   max(2, int(pts[0][2] * 0.5)))
@@ -663,16 +759,16 @@ class Game:
     def draw_sled(self, proj):
         scr = self.screen
         pz, a = self.cam_z + PLAYER_D, self.theta
-        rl = proj(pz - 1.5, a, -SLED_HW, 0.25, True)
-        rr = proj(pz - 1.5, a, SLED_HW, 0.25, True)
-        nose = proj(pz + 4.5, a, 0.0, 0.45, True)
-        fin = proj(pz - 1.5, a, -self.steer * 0.6, 1.6, True)
+        rl = proj(pz - 1.5, a, -SLED_HW, 0.25, True, self.flat)
+        rr = proj(pz - 1.5, a, SLED_HW, 0.25, True, self.flat)
+        nose = proj(pz + 4.5, a, 0.0, 0.45, True, self.flat)
+        fin = proj(pz - 1.5, a, -self.steer * 0.6, 1.6, True, self.flat)
         if not (rl and rr and nose and fin):
             return
         rl, rr, nose, fin = rl[:2], rr[:2], nose[:2], fin[:2]
         hot = self.boost > 0
         flame = (120, 255, 160) if hot else (90, 180, 255)
-        tail = proj(pz - (5.0 if hot else 3.0) - random.random(), a, 0.0, 0.7, True)
+        tail = proj(pz - (5.0 if hot else 3.0) - random.random(), a, 0.0, 0.7, True, self.flat)
         if tail:
             pygame.draw.polygon(scr, flame, (rl, rr, tail[:2]))
         pygame.draw.polygon(scr, (200, 205, 220), (rl, nose, fin))
