@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Neon Conduit - an original tunnel racer written with pygame.
 
-Ride a hover sled through an endless, procedurally generated tube.  Curves
-throw you up the walls, boost pads sit on the fast line, drones get in
-the way, and the clock only stops if you reach the next gate.
+Ride a hover sled through an endless, procedurally generated tube.  Bends
+have a fast line up the outside wall: stray from it and you lose speed.
+Boost pads sit on that line, drones get in the way, and the clock only stops if you reach the next gate.
 
 Controls
     Left / Right (or A / D)   steer around the tube wall
@@ -36,18 +36,30 @@ FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the b
 FLOOR_Y = R * math.cos(FLOOR_A)
 FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
 WALL_H = 2.2        # height of the upright kerbs lining open sections
-OPEN_CHANCE = 0.25  # chance that the next stretch of track is an open run
+OPEN_CHANCE = 0.12  # chance that the next stretch of track is an open run
 OPEN_RUN = (2, 4)   # sections chained into one open run
 WIDE_CHANCE = 0.5   # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
 WIDE_TAPER = 20     # segments over which the kerbs splay out and back in
+
+# The fast line through a bend runs up the outside, further out the tighter the bend.
+LINE_GAIN = 3.0     # wall angle of the line per unit of curvature
+LINE_MAX = 1.2      # ...up to this angle
+LINE_BEND = 0.12    # curvature at which straying from the line costs full price
+LINE_TOL = 2.5      # sideways distance from the line that is still free
+LINE_FALLOFF = 8.0  # further distance over which the penalty grows to its maximum
+LINE_SLOW = 0.35    # fraction of top speed lost when far off the line in a bend
+LINE_HW = 0.35
 SLED_HW = 1.5
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed
 
 GATE_SEGS = 260
 START_TIME = 25.0
-BASE_SPEED = 115.0
+BASE_SPEED = 100.0      # cruising speed at the first gate
+SPEED_CAP = 135.0       # cruising speed stops rising here
+BOOST_MULT = 1.65       # speed multiplier while boosting
+CRASH_KEEP = 0.2        # fraction of speed kept after hitting a drone
 
 FOG = (6, 8, 22)
 PALETTES = [
@@ -239,6 +251,20 @@ class Track:
             else:
                 self._section(*self._shape(level), False, level)
 
+    def line(self, i):
+        """Wall angle of the fast line in segment i: the outside of the bend."""
+        c = self.curv[i]
+        a = -math.copysign(min(LINE_MAX, LINE_GAIN * abs(c)), c)
+        if self.open[i]:
+            # Same distance from the middle, but on the flat and inside the kerbs.
+            lim = self.width[i] - SLED_HW - 0.2
+            a = math.atan(max(-lim, min(lim, lat_pos(a))) / FLOOR_Y)
+        return a
+
+    def bend(self, i):
+        """0 on a straight, 1 in a proper bend."""
+        return min(1.0, abs(self.curv[i]) / LINE_BEND)
+
     def hw_at(self, z):
         """Floor half-width at depth z."""
         f = z / SEG
@@ -297,9 +323,9 @@ class Track:
             if i < n_boost:
                 lim = floor_limit(BOOST_HW, hw)
                 if abs(c) > 0.05:
-                    # The outside of the bend, where the sled gets thrown.
-                    lo, hi = (0.5 * lim, lim) if is_open else (0.7, 1.2)
-                    a = -math.copysign(rng.uniform(lo, hi), c)
+                    a = self.line(start + j)        # on the fast line
+                    if is_open:
+                        a = max(-lim, min(lim, a))
                 elif is_open:
                     a = rng.uniform(-lim, lim)
                 else:
@@ -356,12 +382,13 @@ class Game:
         self.paused = False
         self.sparks = []
         self.flat = 0.0         # 0 in the tube, 1 on the flat floor of an open section
+        self.off_line = 0.0     # 0 on the fast line (or on a straight), 1 far off it in a bend
         self.scrape_cd = 0.0
 
     # -------------------------------------------------------------- update
     @property
     def max_speed(self):
-        return min(150.0, BASE_SPEED + 4.0 * self.level)
+        return min(SPEED_CAP, BASE_SPEED + 4.0 * self.level)
 
     def update(self, dt, keys, auto=False):
         self.t += dt
@@ -370,13 +397,15 @@ class Game:
         brake = keys[pygame.K_DOWN] or keys[pygame.K_s]
         fire = keys[pygame.K_SPACE]
         if auto:
-            steer = max(-1, min(1, -wrap(self.theta) * 2 - self.omega))
+            aim = tr.line(int((self.cam_z + PLAYER_D) // SEG))
+            steer = max(-1, min(1, wrap(aim - self.theta) * 2 - self.omega))
             fire = True
         self.steer = steer
 
         # --- speed
         self.boost = max(0.0, self.boost - dt)
-        target = self.max_speed * (1.45 if self.boost > 0 else 1.0)
+        target = self.max_speed * (BOOST_MULT if self.boost > 0 else 1.0)
+        target *= 1.0 - LINE_SLOW * self.off_line
         if brake:
             target *= 0.35
         rate = 70.0 if self.speed < target else 55.0
@@ -391,8 +420,7 @@ class Game:
         seg = int(pz // SEG)
         tr.ensure(seg + DRAW + 80, self.level)
 
-        # --- wall physics: steering, gravity, and the bend throwing you out
-        vr = self.speed / BASE_SPEED
+        # --- wall physics: steering and gravity
         # Gravity only pulls you back once you are up on the curved wall.
         is_open = tr.open[seg]
         hw = tr.hw_at(pz)
@@ -405,8 +433,7 @@ class Game:
         elif w <= max(FLOOR_A, open_limit) + 0.02:
             self.flat = min(1.0, self.flat + 8.0 * dt)
         slope = bank(w) * (1.0 - self.flat)
-        acc = (16.0 * steer - 14.0 * slope * math.sin(self.theta)
-               - 24.0 * tr.curv[seg] * vr * vr - 3.5 * self.omega)
+        acc = (16.0 * steer - 14.0 * slope * math.sin(self.theta) - 3.5 * self.omega)
         self.omega += acc * dt
         step = self.omega * dt
         if w > FLOOR_A:
@@ -427,6 +454,9 @@ class Game:
                         self.scrape(dt, pz, math.copysign(hw, w), abs(self.omega))
                     self.omega = 0.0
         self.roll += wrap(self.theta - self.roll) * min(1.0, 9.0 * dt)
+        # Bends no longer push the sled around; being off the fast line costs speed instead.
+        off = lat_dist(self.theta, tr.line(seg), is_open) - LINE_TOL
+        self.off_line = tr.bend(seg) * max(0.0, min(1.0, off / LINE_FALLOFF))
         self.heading += tr.curv[seg] * self.speed * dt / SEG
 
         # --- shooting
@@ -466,7 +496,7 @@ class Game:
                         break
                 if alive and abs(z - pz) < 2.5 and lat_dist(o["a"], self.theta, flat) < 3.2:
                     alive = False
-                    self.crash(0.5)
+                    self.crash(CRASH_KEEP)
                     self.effects.append({"z": z, "a": o["a"], "age": 0.0})
             elif kind == "boost":
                 if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
@@ -670,6 +700,19 @@ class Game:
                     nf = len(OPEN_X)
                     for v, t in ((0, nf), (nf - 1, nf + 1)):
                         polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
+                if tr.bend(si) > 0.25:
+                    # The fast line: cyan while the sled is on it, amber when it has strayed.
+                    c = (255, 170, 40) if self.off_line > 0.05 else (80, 230, 255)
+                    lt = (0.75 + 0.25 * (band & 1)) * (1 - fog)
+                    col = (int(c[0] * lt + FOG[0] * fog),
+                           int(c[1] * lt + FOG[1] * fog),
+                           int(c[2] * lt + FOG[2] * fog))
+                    fl = 1.0 if is_open else 0.0
+                    z0, a0, a1 = si * SEG, tr.line(si), tr.line(si + 1)
+                    q = (proj(z0, a0, -LINE_HW, 0.06, False, fl), proj(z0, a0, LINE_HW, 0.06, False, fl),
+                         proj(z0 + SEG, a1, LINE_HW, 0.06, False, fl), proj(z0 + SEG, a1, -LINE_HW, 0.06, False, fl))
+                    if all(q):
+                        polygon(scr, col, [p[:2] for p in q])
             for o in buckets.get(base + i, ()):
                 self.draw_object(o, proj)
 
@@ -770,7 +813,8 @@ class Game:
         self.text(self.font, "SCORE %07d" % self.score, (20, 16))
         self.text(self.font, "GATE %d" % self.level, (20, 44))
         spd = "%3d km/h" % int(self.speed * 4)
-        self.text(self.font, spd, (W - 150, 16), (120, 255, 160) if self.boost > 0 else (235, 240, 255))
+        self.text(self.font, spd, (W - 150, 16), (120, 255, 160) if self.boost > 0 else
+                  (255, 170, 40) if self.off_line > 0.05 else (235, 240, 255))
         # progress to the next gate
         pz = self.cam_z + PLAYER_D
         prog = (pz / SEG % GATE_SEGS) / GATE_SEGS
@@ -787,7 +831,7 @@ class Game:
         if self.state == "title":
             self.text(self.big, "NEON CONDUIT", (mid, 190), (255, 80, 160), center=True)
             lines = ["Reach each gate before the clock runs out.",
-                     "Ride the outside of bends for the green boost pads.",
+                     "Follow the cyan line through bends: off it, you lose speed.",
                      "",
                      "Left / Right  steer      Down  brake      Space  fire",
                      "P  pause      Esc  quit",
