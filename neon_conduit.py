@@ -2,8 +2,8 @@
 """Neon Conduit - an original tunnel racer written with pygame.
 
 Ride a hover sled through an endless, procedurally generated tube.  Curves
-throw you up the walls, boost pads sit on the fast line, barriers and drones
-get in the way, and the clock only stops if you reach the next gate.
+throw you up the walls, boost pads sit on the fast line, drones get in
+the way, and the clock only stops if you reach the next gate.
 
 Controls
     Left / Right (or A / D)   steer around the tube wall
@@ -59,7 +59,6 @@ PALETTES = [
 ]
 
 BOOST_HW = 2.2      # half-widths, in world units
-BLOCK_HW = 3.0
 
 
 def floor_limit(half_width, hw=None):
@@ -290,11 +289,8 @@ class Track:
             return
 
         n_boost = rng.randint(1, 2)
-        n_block = rng.randint(0, min(4, 1 + level // 2))
-        if widths and max(widths) > 1.3 * FLOOR_HW:
-            n_block += 1            # more room to dodge on a wide floor
         n_drone = rng.randint(0, min(3, 1 + level // 3))
-        slots = rng.sample(range(3, n - 2), n_boost + n_block + n_drone)
+        slots = rng.sample(range(3, n - 2), n_boost + n_drone)
         for i, j in enumerate(slots):
             z = (start + j) * SEG
             hw = min(self.width[start + j], self.width[start + j + 2])
@@ -309,15 +305,6 @@ class Track:
                 else:
                     a = rng.uniform(-1.0, 1.0)
                 self.objects.append({"kind": "boost", "z": z, "a": a if is_open else snap(a, BOOST_HW)})
-            elif i < n_boost + n_block:
-                if is_open:
-                    lim = floor_limit(BLOCK_HW, hw)
-                    a = rng.uniform(-lim, lim)
-                elif rng.random() < 0.7:
-                    a = rng.uniform(-1.2, 1.2)
-                else:
-                    a = rng.uniform(-math.pi, math.pi)
-                self.objects.append({"kind": "block", "z": z, "a": a if is_open else snap(a, BLOCK_HW)})
             else:
                 self.objects.append({
                     "kind": "drone", "z": z, "a0": rng.uniform(-0.9, 0.9),
@@ -481,9 +468,6 @@ class Game:
                     alive = False
                     self.crash(0.5)
                     self.effects.append({"z": z, "a": o["a"], "age": 0.0})
-            elif kind == "block":
-                if prev_pz < z <= pz and lat_dist(o["a"], self.theta, flat) < BLOCK_HW + 1.2:
-                    self.crash(0.3)
             elif kind == "boost":
                 if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
                     if self.boost < 1.0:
@@ -719,14 +703,6 @@ class Game:
                 tip, l, r_ = proj(z + 8, a, 0, 0.2), proj(z + 3, a, -1.3, 0.2), proj(z + 3, a, 1.3, 0.2)
                 if tip and l and r_:
                     pygame.draw.polygon(scr, (10, 60, 30), (tip[:2], l[:2], r_[:2]))
-        elif kind == "block":
-            a, hw = o["a"], BLOCK_HW
-            q = [proj(z, a, -hw, 0.0), proj(z, a, hw, 0.0),
-                 proj(z, a, hw * 0.9, 3.0), proj(z, a, -hw * 0.9, 3.0)]
-            if all(q):
-                pts = [p[:2] for p in q]
-                pygame.draw.polygon(scr, (215, 50, 40), pts)
-                pygame.draw.polygon(scr, (255, 210, 60), pts, max(1, int(q[0][2] * 0.12)))
         elif kind == "drone":
             p = proj(z, o["a"], 0.0, 1.5, True)
             if p:
