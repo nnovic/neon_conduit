@@ -33,6 +33,7 @@ SIDES = 16          # polygon sides of the tube
 DRAW = 60           # rings drawn ahead of the camera
 PLAYER_D = 12.0     # how far ahead of the camera the sled sits
 CAM_H = 3.5         # camera height above the surface the sled is riding on
+CAM_LAG = 0.45      # how far the camera lags behind the sled's way round the tube (0 = none)
 FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the bottom
 FLOOR_Y = R * math.cos(FLOOR_A)
 FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
@@ -664,11 +665,15 @@ class Game:
         tr = self.track
         scr.fill(FOG)
 
-        # Camera sits above the sled's spot on the surface, rolled to match it:
-        # level on the floor, banked on the walls.
-        tilt = wrap(self.roll) * bank(self.roll) * (1.0 - self.flat)
+        # Camera sits above the surface part of the way round to the sled, rolled to
+        # match that spot: level on the floor, banked on the walls. Lagging behind the
+        # sled like this lets it swing out towards the sides of the screen. The lag
+        # fades out towards the ceiling, so looping right round the tube stays smooth.
+        w = wrap(self.roll)
+        cam_a = w - CAM_LAG * math.sin(w)
+        tilt = cam_a * bank(cam_a) * (1.0 - self.flat)
         cr, sr = math.cos(tilt), math.sin(tilt)
-        camx, camy = wall_xy(self.roll, 0.0, CAM_H, rigid=True, flat=self.flat)
+        camx, camy = wall_xy(cam_a, 0.0, CAM_H, rigid=True, flat=self.flat)
         ox_s = oy_s = 0
         if self.shake > 0:
             ox_s = random.uniform(-1, 1) * 22 * self.shake
