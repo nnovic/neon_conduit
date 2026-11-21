@@ -311,9 +311,10 @@ class Track:
         return self.kerb_cols[run][band & 1]
 
     def door_angle(self, i):
-        """Random tilt of door i's split line, fixed per door (and kept off the track's own rng)."""
+        """Tilt of door i's split line: vertical, horizontal or either diagonal, picked at
+        random once per door (and kept off the track's own rng)."""
         if i not in self.door_angles:
-            self.door_angles[i] = random.Random(i).uniform(0.0, math.pi)
+            self.door_angles[i] = random.Random(i).choice((0.0, 0.5, 0.25, 0.75)) * math.pi
         return self.door_angles[i]
 
     def bend(self, i):
