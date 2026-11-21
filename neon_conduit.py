@@ -267,6 +267,8 @@ class Track:
         self.width = []            # floor half-width at the start of each segment
         self.objects = []          # dicts: kind, z, a, ...
         self.door_angles = {}
+        self.stretch = []          # per segment: how many open runs come before it
+        self.runs = 0
         self.next_gate = GATE_SEGS
         self._section(30, 0.0, 0.0, False, 0, empty=True)
 
@@ -322,6 +324,7 @@ class Track:
     def _open_run(self, level):
         """Several open sections back to back; some runs splay out to a wider floor."""
         rng = self.rng
+        self.runs += 1
         shapes = [self._shape(level) for _ in range(rng.randint(*OPEN_RUN))]
         total = sum(n for n, _, _ in shapes)
         peak = rng.uniform(*WIDE_HW) if rng.random() < WIDE_CHANCE else FLOOR_HW
@@ -343,6 +346,7 @@ class Track:
             self.curv.append(c * env)
             self.pitch.append(p * env)
             self.open.append(is_open)
+            self.stretch.append(self.runs)
             self.width.append(widths[j] if widths else FLOOR_HW)
         # Checkpoint gates at fixed intervals.
         while self.next_gate < start + n:
@@ -705,7 +709,6 @@ class Game:
         for e in self.effects:
             buckets.setdefault(int(e["z"] // SEG), []).append(e)
 
-        pal = PALETTES[self.level % len(PALETTES)]
         polygon = pygame.draw.polygon
         for i in range(DRAW - 1, -1, -1):
             if (i + 1 - frac) * SEG > NEAR:
@@ -724,7 +727,8 @@ class Game:
                     if abs(SIDE_MID[s]) < FLOOR_A:
                         c = FLOOR_COLS[band & 1]
                     else:
-                        c = pal[(band + s) & 1]
+                        # One colour scheme per stretch of tube: it only changes out in the open.
+                        c = PALETTES[tr.stretch[si] % len(PALETTES)][(band + s) & 1]
                     if gate_glow:
                         c = (240, 240, 255)
                     lt = SIDE_LIGHT[s] * (1 - fog)
