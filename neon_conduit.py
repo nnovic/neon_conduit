@@ -14,6 +14,7 @@ Controls
     Esc                       quit
 """
 import argparse
+import colorsys
 import math
 import random
 import sys
@@ -175,7 +176,13 @@ FLOOR_SIDES = [s for s in range(SIDES) if abs(SIDE_MID[s]) < FLOOR_A]
 # Floor vertices across an open section, as fractions of its half-width (-1 .. 1).
 OPEN_X = [math.tan(SIDE_A[v]) / math.tan(FLOOR_A)
           for v in range(FLOOR_SIDES[0], FLOOR_SIDES[-1] + 2)]
-KERB_COLS = ((230, 200, 60), (150, 120, 40))
+
+
+def kerb_cols(run):
+    """Random bright / dark stripe pair for the kerbs of open run number run."""
+    rng = random.Random(run * 7919 + 1)
+    h, s = rng.random(), rng.uniform(0.55, 0.85)
+    return tuple(tuple(int(255 * x) for x in colorsys.hsv_to_rgb(h, s, v)) for v in (0.9, 0.58))
 
 
 def wrap(a):
@@ -268,6 +275,7 @@ class Track:
         self.width = []            # floor half-width at the start of each segment
         self.objects = []          # dicts: kind, z, a, ...
         self.door_angles = {}
+        self.kerb_cols = {}
         self.stretch = []          # per segment: how many open runs come before it
         self.runs = 0
         self.next_gate = GATE_SEGS
@@ -294,6 +302,13 @@ class Track:
     def is_door(self, i):
         """True where segment i is tube following an open section: a door closes it off."""
         return 0 < i < len(self.open) and self.open[i - 1] and not self.open[i]
+
+    def kerb_col(self, i, band):
+        """Kerb colour in open segment i: one random scheme per open run, striped by band."""
+        run = self.stretch[i]
+        if run not in self.kerb_cols:
+            self.kerb_cols[run] = kerb_cols(run)
+        return self.kerb_cols[run][band & 1]
 
     def door_angle(self, i):
         """Random tilt of door i's split line, fixed per door (and kept off the track's own rng)."""
@@ -740,7 +755,7 @@ class Game:
                     polygon(scr, col, (r0[s - off], r0[s - off + 1], r1[s - off + 1], r1[s - off]))
                 if is_open:
                     # Upright kerbs at the floor edges: too steep to ride up. Inner face, then top.
-                    c = (240, 240, 255) if gate_glow else KERB_COLS[band & 1]
+                    c = (240, 240, 255) if gate_glow else tr.kerb_col(si, band)
                     nf = len(OPEN_X)
                     for c, lt, quads in ((c, 0.72, ((0, nf), (nf - 1, nf + 1))),
                                          (mix(c, (255, 250, 225), 0.35), 1.0, ((nf, nf + 2), (nf + 1, nf + 3)))):
