@@ -36,6 +36,7 @@ FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the b
 FLOOR_Y = R * math.cos(FLOOR_A)
 FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
 WALL_H = 2.2        # height of the upright kerbs lining open sections
+WALL_T = WALL_H     # ...and their thickness
 OPEN_CHANCE = 0.12  # chance that the next stretch of track is an open run
 OPEN_RUN = (2, 4)   # sections chained into one open run
 WIDE_CHANCE = 0.5   # chance that an open run widens out
@@ -687,14 +688,15 @@ class Game:
                 py = oy + SIDE_R[s] * SIDE_COS[s]
                 pts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
             rings.append(pts)
-            # Open-section outline at this ring: floor vertices, then the two kerb tops.
+            # Open-section outline at this ring: floor vertices, then the two kerb tops
+            # (inner edges, then outer edges).
             hw = tr.width[base + i]
             py = oy + FLOOR_Y
             opts = [(pcx + k * ((ox + f * hw) * cr - py * sr), pcy + k * ((ox + f * hw) * sr + py * cr))
                     for f in OPEN_X]
             py -= WALL_H
-            for f in (-1.0, 1.0):
-                px = ox + f * hw
+            for f in (-1.0, 1.0, -1.0, 1.0):
+                px = ox + f * (hw if len(opts) < len(OPEN_X) + 2 else hw + WALL_T)
                 opts.append((pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr)))
             orings.append(opts)
 
@@ -737,15 +739,17 @@ class Game:
                            int(c[2] * lt + FOG[2] * fog))
                     polygon(scr, col, (r0[s - off], r0[s - off + 1], r1[s - off + 1], r1[s - off]))
                 if is_open:
-                    # Upright kerbs at the floor edges: too steep to ride up.
+                    # Upright kerbs at the floor edges: too steep to ride up. Inner face, then top.
                     c = (240, 240, 255) if gate_glow else KERB_COLS[band & 1]
-                    lt = 0.85 * (1 - fog)
-                    col = (int(c[0] * lt + FOG[0] * fog),
-                           int(c[1] * lt + FOG[1] * fog),
-                           int(c[2] * lt + FOG[2] * fog))
                     nf = len(OPEN_X)
-                    for v, t in ((0, nf), (nf - 1, nf + 1)):
-                        polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
+                    for c, lt, quads in ((c, 0.72, ((0, nf), (nf - 1, nf + 1))),
+                                         (mix(c, (255, 250, 225), 0.35), 1.0, ((nf, nf + 2), (nf + 1, nf + 3)))):
+                        lt *= 1 - fog
+                        col = (int(c[0] * lt + FOG[0] * fog),
+                               int(c[1] * lt + FOG[1] * fog),
+                               int(c[2] * lt + FOG[2] * fog))
+                        for v, t in quads:
+                            polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
                 if tr.bend(si) > 0.25:
                     # The fast line: cyan while the sled is on it, amber when it has strayed.
                     c = (255, 170, 40) if self.off_line > 0.05 else (80, 230, 255)
