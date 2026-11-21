@@ -41,6 +41,10 @@ OPEN_RUN = (2, 4)   # sections chained into one open run
 WIDE_CHANCE = 0.5   # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
 WIDE_TAPER = 20     # segments over which the kerbs splay out and back in
+DOOR_OPEN_AT = 115.0    # distance ahead of the sled at which a tube door starts to open
+DOOR_SLIDE = 70.0       # distance over which it slides fully open
+DOOR_COL = (70, 78, 112)
+DOOR_EDGE = (255, 200, 60)
 
 # The fast line through a bend runs up the outside, further out the tighter the bend.
 LINE_GAIN = 3.0     # wall angle of the line per unit of curvature
@@ -178,6 +182,27 @@ def wrap(a):
     return (a + math.pi) % (2 * math.pi) - math.pi
 
 
+def clip(poly, c, below, axis=0):
+    """The part of convex polygon poly where coordinate axis is <= c (below) or >= c."""
+    out = []
+    n = len(poly)
+    for j in range(n):
+        p, q = poly[j], poly[(j + 1) % n]
+        pin = p[axis] <= c if below else p[axis] >= c
+        qin = q[axis] <= c if below else q[axis] >= c
+        if pin:
+            out.append(p)
+        if pin != qin:
+            t = (c - p[axis]) / (q[axis] - p[axis])
+            m = (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+            out.append((c, m[1]) if axis == 0 else (m[0], c))
+    return out
+
+
+# Cross-section of the tube, (x, y) with y pointing down: the shape a door has to fill.
+TUBE_XS = [(SIDE_R[s] * math.sin(SIDE_A[s]), SIDE_R[s] * math.cos(SIDE_A[s])) for s in range(SIDES)]
+
+
 def mix(c1, c2, t):
     return (int(c1[0] + (c2[0] - c1[0]) * t),
             int(c1[1] + (c2[1] - c1[1]) * t),
@@ -200,6 +225,7 @@ class Audio:
                 "boom": self._noise(0.22, 0.3),
                 "gate": self._sweep(500, 1300, 0.45, 0.3),
                 "scrape": self._noise(0.14, 0.22),
+                "door": self._sweep(160, 60, 0.6, 0.18),
             }
             self.ok = True
         except pygame.error:
@@ -240,6 +266,7 @@ class Track:
         self.open = []
         self.width = []            # floor half-width at the start of each segment
         self.objects = []          # dicts: kind, z, a, ...
+        self.door_angles = {}
         self.next_gate = GATE_SEGS
         self._section(30, 0.0, 0.0, False, 0, empty=True)
 
@@ -260,6 +287,16 @@ class Track:
             lim = self.width[i] - SLED_HW - 0.2
             a = math.atan(max(-lim, min(lim, lat_pos(a))) / FLOOR_Y)
         return a
+
+    def is_door(self, i):
+        """True where segment i is tube following an open section: a door closes it off."""
+        return 0 < i < len(self.open) and self.open[i - 1] and not self.open[i]
+
+    def door_angle(self, i):
+        """Random tilt of door i's split line, fixed per door (and kept off the track's own rng)."""
+        if i not in self.door_angles:
+            self.door_angles[i] = random.Random(i).uniform(0.0, math.pi)
+        return self.door_angles[i]
 
     def bend(self, i):
         """0 on a straight, 1 in a proper bend."""
@@ -419,6 +456,10 @@ class Game:
         pz = self.cam_z + PLAYER_D
         seg = int(pz // SEG)
         tr.ensure(seg + DRAW + 80, self.level)
+        # Doors back into the tube start sliding open as the sled draws near.
+        for i in range(int((prev_pz + DOOR_OPEN_AT) // SEG) + 1, int((pz + DOOR_OPEN_AT) // SEG) + 1):
+            if tr.is_door(i):
+                self.audio.play("door")
 
         # --- wall physics: steering and gravity
         # Gravity only pulls you back once you are up on the curved wall.
@@ -630,11 +671,12 @@ class Game:
             return pcx + k * (px * cr - py * sr), pcy + k * (px * sr + py * cr), k
 
         # project ring vertices
-        rings, orings = [], []
+        rings, orings, frames = [], [], []
         for i in range(DRAW + 1):
             d = max(NEAR, (i - frac) * SEG)
             k = focal / d
             ox, oy = rcx[i] - camx, rcy[i] - camy
+            frames.append((ox, oy, k))
             pts = []
             for s in range(SIDES + 1):
                 px = ox + SIDE_R[s] * SIDE_SIN[s]
@@ -715,6 +757,8 @@ class Game:
                         polygon(scr, col, [p[:2] for p in q])
             for o in buckets.get(base + i, ()):
                 self.draw_object(o, proj)
+            if tr.is_door(base + i) and (i - frac) * SEG > NEAR:
+                self.draw_door(frames[i], base + i, (max(0.0, i - frac) / DRAW), pcx, pcy, cr, sr)
 
         self.draw_sled(proj)
         for p in self.sparks:
@@ -774,6 +818,57 @@ class Game:
             p0, p1 = proj(z, o["a"], 0.0, 1.0, True), proj(z + 5, o["a"], 0.0, 1.0, True)
             if p0 and p1:
                 pygame.draw.line(scr, (255, 255, 120), p0[:2], p1[:2], max(2, int(p0[2] * 0.12)))
+
+    def draw_door(self, frame, i, depth, pcx, pcy, cr, sr):
+        """Sliding door across the mouth of segment i; it parts as the sled draws near.
+
+        The panels are laid out in the door's own frame, tilted by its random angle:
+        they split along that frame's vertical and slide apart along its horizontal.
+        """
+        ox, oy, k = frame
+        z = i * SEG
+        phi = self.track.door_angle(i)
+        dc, ds = math.cos(phi), math.sin(phi)
+
+        def to_screen(pts):
+            out = []
+            for u, v in pts:
+                x, y = ox + u * dc - v * ds, oy + u * ds + v * dc
+                out.append((pcx + k * (x * cr - y * sr), pcy + k * (x * sr + y * cr)))
+            return out
+
+        shape = [(x * dc + y * ds, -x * ds + y * dc) for x, y in TUBE_XS]   # tube in the door's frame
+
+        fog = 0.6 * min(1.0, depth ** 1.3 * 1.15)   # lit doorway: shows through the haze
+
+        def fogged(c, lt=1.0):
+            return (int(c[0] * lt * (1 - fog) + FOG[0] * fog),
+                    int(c[1] * lt * (1 - fog) + FOG[1] * fog),
+                    int(c[2] * lt * (1 - fog) + FOG[2] * fog))
+
+        dist = z - (self.cam_z + PLAYER_D)
+        u = max(0.0, min(1.0, (DOOR_OPEN_AT - dist) / DOOR_SLIDE))
+        u = u * u * (3 - 2 * u)
+        gap = u * R * 1.05          # each panel has slid this far into the wall
+        strip = 0.9                 # width of the warning strip along each leading edge
+        for side in (-1.0, 1.0):
+            left = side < 0
+            edge = side * gap
+            body = clip(shape, edge, left)
+            if len(body) < 3:
+                continue
+            pygame.draw.polygon(self.screen, fogged(DOOR_COL), to_screen(body))
+            # Lighter ribs across the panel, then a warning strip on its leading edge.
+            inner = clip(body, edge + side * strip, left)
+            for y in (-5.0, -1.5, 2.0, 5.5):
+                rib = clip(clip(inner, y - 0.3, False, 1), y + 0.3, True, 1)
+                if len(rib) >= 3:
+                    pygame.draw.polygon(self.screen, fogged(DOOR_COL, 1.6), to_screen(rib))
+            lip = clip(body, edge + side * strip, not left)
+            if len(lip) >= 3:
+                pygame.draw.polygon(self.screen, fogged(DOOR_EDGE), to_screen(lip))
+        # Glowing frame around the tube mouth.
+        pygame.draw.lines(self.screen, fogged((255, 80, 160)), True, to_screen(shape), max(1, int(k * 0.35)))
 
     def draw_sled(self, proj):
         scr = self.screen
