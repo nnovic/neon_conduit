@@ -178,6 +178,29 @@ OPEN_X = [math.tan(SIDE_A[v]) / math.tan(FLOOR_A)
           for v in range(FLOOR_SIDES[0], FLOOR_SIDES[-1] + 2)]
 
 
+# Wall patterns for a stretch of tube; see tube_shade.
+TUBE_STYLES = ("checker", "rings", "stripes", "chevrons", "whirl", "pulse")
+
+
+def tube_shade(style, si, s, t):
+    """How far along from the palette's first colour to its second (0..1) side s of
+    segment si is painted, for a tube style at time t."""
+    if style == "checker":
+        return (si // 2 + s) & 1
+    if style == "rings":                     # bands round the tube: circles down the middle
+        return (si // 3) & 1
+    if style == "stripes":                   # dashed lines along the tube, staggered side to side
+        return 1 if s & 1 and (si + 3 * (s // 2 & 1)) % 6 < 4 else 0
+    m = SIDE_MID[s]
+    if style == "chevrons":                  # V shapes, mirrored left and right
+        return ((si + int(abs(m) * SIDES / (2 * math.pi))) // 2) & 1
+    if style == "whirl":                     # two-armed spiral, turning
+        v = math.sin(2 * m + 0.3 * si - 4.0 * t)
+    else:                                    # pulse: soft waves rushing towards the sled
+        v = math.sin(0.45 * si + 7.0 * t)
+    return max(0.0, min(1.0, 0.5 + 1.5 * v))
+
+
 def kerb_cols(run):
     """Random bright / dark stripe pair for the kerbs of open run number run."""
     rng = random.Random(run * 7919 + 1)
@@ -276,6 +299,7 @@ class Track:
         self.objects = []          # dicts: kind, z, a, ...
         self.door_angles = {}
         self.kerb_cols = {}
+        self.tube_styles = {}
         self.stretch = []          # per segment: how many open runs come before it
         self.runs = 0
         self.next_gate = GATE_SEGS
@@ -302,6 +326,13 @@ class Track:
     def is_door(self, i):
         """True where segment i is tube following an open section: a door closes it off."""
         return 0 < i < len(self.open) and self.open[i - 1] and not self.open[i]
+
+    def tube_style(self, i):
+        """Wall pattern of tube segment i: one random style per stretch of tube."""
+        run = self.stretch[i]
+        if run not in self.tube_styles:
+            self.tube_styles[run] = random.Random(run * 104729 + 7).choice(TUBE_STYLES)
+        return self.tube_styles[run]
 
     def kerb_col(self, i, band):
         """Kerb colour in open segment i: one random scheme per open run, striped by band."""
@@ -741,12 +772,17 @@ class Game:
                     off = FLOOR_SIDES[0]
                 else:
                     off = 0
+                    # One colour scheme and pattern per stretch of tube: they only change out in the open.
+                    pal = PALETTES[tr.stretch[si] % len(PALETTES)]
+                    style = tr.tube_style(si)
+                    if style != "checker":
+                        # Starker contrast, so the pattern carries.
+                        pal = (mix(pal[0], (0, 0, 0), 0.5), tuple(min(255, int(v * 1.45)) for v in pal[1]))
                 for s in (FLOOR_SIDES if is_open else range(SIDES)):
                     if abs(SIDE_MID[s]) < FLOOR_A:
                         c = FLOOR_COLS[band & 1]
                     else:
-                        # One colour scheme per stretch of tube: it only changes out in the open.
-                        c = PALETTES[tr.stretch[si] % len(PALETTES)][(band + s) & 1]
+                        c = mix(pal[0], pal[1], tube_shade(style, si, s, self.t))
                     if gate_glow:
                         c = (240, 240, 255)
                     lt = SIDE_LIGHT[s] * (1 - fog)
