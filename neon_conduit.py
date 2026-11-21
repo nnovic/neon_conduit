@@ -194,7 +194,9 @@ def tube_shade(style, si, s, t):
     m = SIDE_MID[s]
     if style == "chevrons":                  # V shapes, mirrored left and right
         return ((si + int(abs(m) * SIDES / (2 * math.pi))) // 2) & 1
-    if style == "whirl":                     # two-armed spiral, turning
+    if style == "whirl":                     # two-armed spiral, turning, its arms cut into dashes
+        if si % 6 >= 4:
+            return 0.0
         v = math.sin(2 * m + 0.3 * si - 4.0 * t)
     else:                                    # pulse: soft waves rushing towards the sled
         v = math.sin(0.45 * si + 7.0 * t)
