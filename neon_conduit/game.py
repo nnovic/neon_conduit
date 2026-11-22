@@ -8,8 +8,8 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, CRASH_KEEP, DOOR_OPEN_AT, DRAW, FLAT_MAX,
-                     FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
+from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, BOOST_TIME, CRASH_KEEP, DOOR_OPEN_AT, DRAW,
+                     FLAT_MAX, FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, lat_dist, wrap
 from .track import Track
@@ -197,10 +197,10 @@ class Game:
                     self.effects.append({"z": z, "a": o["a"], "age": 0.0})
             elif kind == "boost":
                 if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
-                    if self.boost < 1.0:
+                    if self.boost < BOOST_TIME - 0.6:       # not while still on the same pad
                         self.audio.play("boost")
                         self.score += 100
-                    self.boost = 1.6
+                    self.boost = BOOST_TIME
             elif kind == "gate":
                 if self.prev_z < z <= pz:
                     alive = False

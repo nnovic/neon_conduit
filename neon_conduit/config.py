@@ -46,10 +46,12 @@ LINE_TOL = 2.5          # sideways distance from the line that is still free
 LINE_FALLOFF = 8.0      # further distance over which the penalty grows to its maximum
 LINE_SLOW = 0.35        # fraction of top speed lost when far off the line in a bend
 LINE_HW = 0.35          # half-width of the line as drawn in developer mode
-# Hint stars float above the fast line through bends, showing the way.
-STAR_EVERY = 3          # one star every this many segments...
+# Hint stars are painted on the fast line through bends, showing the way.
+STAR_EVERY = 6          # one star every this many segments...
 STAR_BEND = 0.5         # ...where the bend is at least this sharp (see Track.bend)
-STAR_H = 1.3            # height above the surface
+STAR_R = 2.2            # radius, on the surface
+STAR_STRETCH = 2.5      # stretched along the track, like road markings, so it reads from a low camera
+STAR_REACH = STAR_STRETCH * STAR_R * 1.4   # how far a star (with its glow) extends along the track
 STAR_SCORE = 25         # points for riding through one
 
 # ---------------------------------------------------------------- objects
@@ -65,4 +67,5 @@ START_TIME = 25.0
 BASE_SPEED = 100.0      # cruising speed at the first gate
 SPEED_CAP = 135.0       # cruising speed stops rising here
 BOOST_MULT = 1.65       # speed multiplier while boosting
+BOOST_TIME = 3.5        # seconds a boost pad keeps it going
 CRASH_KEEP = 0.2        # fraction of speed kept after hitting a drone

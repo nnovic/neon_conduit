@@ -3,7 +3,7 @@ import math
 import random
 
 from .config import (BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
-                     LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY,
+                     LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
                      WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import TUBE_STYLES, kerb_cols
@@ -28,6 +28,7 @@ class Track:
         self.door_angles = {}
         self.kerb_cols = {}
         self.tube_styles = {}
+        self.no_star = set()       # segments whose star would overlap a boost pad
         self.runs = 0
         self.next_gate = GATE_SEGS
         self._section(30, 0.0, 0.0, False, 0, empty=True)
@@ -58,7 +59,7 @@ class Track:
 
     def has_star(self, i):
         """True where a hint star floats over the fast line at the start of segment i."""
-        return i % STAR_EVERY == 0 and self.bend(i) >= STAR_BEND
+        return i % STAR_EVERY == 0 and self.bend(i) >= STAR_BEND and i not in self.no_star
 
     def hw_at(self, z):
         """Floor half-width at depth z."""
@@ -155,6 +156,9 @@ class Track:
                 else:
                     a = rng.uniform(-1.0, 1.0)
                 self.objects.append({"kind": "boost", "z": z, "a": a if is_open else snap(a, BOOST_HW)})
+                # Keep stars off the pad (it runs from z to z + 10).
+                for k in range(int((z - STAR_REACH) // SEG), int((z + 10 + STAR_REACH) // SEG) + 1):
+                    self.no_star.add(k)
             else:
                 self.objects.append({
                     "kind": "drone", "z": z, "a0": rng.uniform(-0.9, 0.9),

@@ -9,12 +9,28 @@ import random
 import pygame
 
 from . import config
-from .config import (BOOST_HW, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y, FOCAL, GATE_SEGS,
-                     HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, STAR_H, WALL_H, WALL_T, CAM_H, CAM_LAG)
+from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
+                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, STAR_R,
+                     STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
                        TUBE_XS, bank, clip, wall_xy, wrap)
 from .palette import (DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette,
                       tube_shade)
+
+
+def star_fan(radius):
+    """A five-pointed star pointing ahead, stretched along the track, as a fan of triangles
+    in surface coordinates (along the track, sideways along the wall) around its centre."""
+    pts = []
+    for j in range(10):
+        ang = j * math.pi / 5
+        rr = radius if j % 2 == 0 else radius * 0.42
+        pts.append((STAR_STRETCH * rr * math.cos(ang), rr * math.sin(ang)))
+    return [((0.0, 0.0), pts[j], pts[(j + 1) % 10]) for j in range(10)]
+
+
+STAR_GLOW = star_fan(STAR_R * 1.4)
+STAR_CORE = star_fan(STAR_R)
 
 
 class Renderer:
@@ -64,10 +80,9 @@ class Renderer:
                     self._tube_segment(tr, si, rings[i], rings[i + 1], fog)
                 if config.DEVELOPER_MODE and tr.bend(si) > 0.25:
                     self._fast_line(tr, si, fog)
+                self._hint_stars(tr, si)
             for o in buckets.get(si, ()):
                 self._object(o)
-            if tr.has_star(si) and si not in game.stars_taken:
-                self._hint_star(tr, si)
             if tr.is_door(si) and (i - frac) * SEG > NEAR:
                 self._door(frames[i], si, max(0.0, i - frac) / DRAW)
 
@@ -258,7 +273,7 @@ class Renderer:
                 pygame.draw.lines(scr, (255, 255, 160), False, [p[:2] for p in pts],
                                   max(2, int(pts[0][2] * 0.5)))
         elif kind == "sparkle":                               # hint star picked up
-            p = proj(z, o["a"], 0.0, STAR_H, True)
+            p = proj(z, o["a"], 0.0, 0.3)
             if p:
                 t = o["age"] / 0.45
                 r = p[2] * (0.8 + 2.5 * t)
@@ -279,25 +294,31 @@ class Renderer:
             if p0 and p1:
                 pygame.draw.line(scr, (255, 255, 120), p0[:2], p1[:2], max(2, int(p0[2] * 0.12)))
 
-    def _hint_star(self, tr, si):
-        """A twinkling five-pointed star floating over the fast line at segment si."""
-        z = si * SEG
-        p = self.proj(z, tr.line(si), 0.0, STAR_H, True, 1.0 if tr.open[si] else 0.0)
-        if not p:
-            return
-        t = self.game.t
-        r = p[2] * 0.9 * (1.0 + 0.15 * math.sin(t * 8 + si))
-        spin = t * 2.0 + si
-        pts = []
-        for j in range(10):
-            ang = spin + j * math.pi / 5
-            rr = r if j % 2 == 0 else r * 0.45
-            pts.append((p[0] + rr * math.sin(ang), p[1] - rr * math.cos(ang)))
-        if r > 3:
-            pygame.draw.circle(self.screen, (120, 90, 20), (p[0], p[1]), r * 0.8)   # glow
-        pygame.draw.polygon(self.screen, (255, 225, 80), pts)
-        if r > 6:
-            pygame.draw.polygon(self.screen, (255, 255, 230), pts, max(1, int(r * 0.08)))
+    def _hint_stars(self, tr, si):
+        """The parts of hint stars that lie on segment si, painted on its surface.
+
+        Stars are longer than a segment, so each is sliced at segment boundaries and
+        every slice is drawn in its own segment's turn: nearer surfaces then hide
+        exactly what they should, no more.
+        """
+        lo, hi = si * SEG, (si + 1) * SEG
+        taken = self.game.stars_taken
+        for k in range(int((lo - STAR_REACH) // SEG), int((hi + STAR_REACH) // SEG) + 1):
+            if k < 0 or k in taken or not tr.has_star(k):
+                continue
+            zk, a = k * SEG, tr.line(k)
+            fl = 1.0 if tr.open[k] else 0.0
+            tw = 0.5 + 0.5 * math.sin(self.game.t * 8 + k)               # twinkle, 0 .. 1
+            for fan, h, col in ((STAR_GLOW, 0.04, mix((110, 80, 15), (170, 125, 25), tw)),
+                                (STAR_CORE, 0.08, mix((240, 200, 60), (255, 245, 170), tw))):
+                for tri in fan:
+                    # A little past the far boundary, over the seam the surface leaves there.
+                    piece = clip(clip(tri, lo - zk, False), hi + 0.4 - zk, True)
+                    if len(piece) < 3:
+                        continue
+                    pts = [self.proj(zk + u, a, v, h, False, fl) for u, v in piece]
+                    if all(pts):
+                        pygame.draw.polygon(self.screen, col, [p[:2] for p in pts])
 
     def _door(self, frame, i, depth):
         """Sliding door across the mouth of segment i; it parts as the sled draws near.
