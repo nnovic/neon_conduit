@@ -23,12 +23,12 @@ def mix(c1, c2, t):
             int(c1[2] + (c2[2] - c1[2]) * t))
 
 
-def fogged(c, lt, fog):
-    """Colour c lit at strength lt, then faded fog of the way into the fog."""
+def fogged(c, lt, fog, fog_col=FOG):
+    """Colour c lit at strength lt, then faded fog of the way into the fog (of colour fog_col)."""
     lt *= 1 - fog
-    return (int(c[0] * lt + FOG[0] * fog),
-            int(c[1] * lt + FOG[1] * fog),
-            int(c[2] * lt + FOG[2] * fog))
+    return (int(c[0] * lt + fog_col[0] * fog),
+            int(c[1] * lt + fog_col[1] * fog),
+            int(c[2] * lt + fog_col[2] * fog))
 
 
 def tube_palette(stretch, contrast="strong"):

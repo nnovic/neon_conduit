@@ -26,6 +26,10 @@ PLAYER_D = 12.0         # how far ahead of the camera the sled sits
 CAM_H = 3.5             # camera height above the surface the sled is riding on
 CAM_LAG = 0.45          # how far the camera lags behind the sled's way round the tube (0 = none)
 
+SKY_RISE_MAX = 140.0    # pixels the horizon moves up or down at most as the track dips or climbs
+SKY_RISE_GAIN = 40.0    # ...and how many pixels per unit of dive (see Game.dive) below that
+DIVE_SETTLE = 2.0       # seconds for the horizon to settle back after a dip or a climb
+
 # ---------------------------------------------------------- open sections
 WALL_H = 2.2            # height of the upright kerbs lining open sections
 WALL_T = WALL_H         # ...and their thickness
@@ -34,6 +38,8 @@ OPEN_RUN = (2, 4)       # sections chained into one open run
 WIDE_CHANCE = 0.5       # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
 WIDE_TAPER = 20         # segments over which the kerbs splay out and back in
+OUTDOOR_THEMES = ("metropolis", "dunes", "glacier", "orbit")   # backdrops (assets/sky_<name>.jpg),
+                                                                # one picked per open run
 
 # ------------------------------------------------------------------ doors
 DOOR_OPEN_AT = 115.0    # distance ahead of the sled at which a tube door starts to open

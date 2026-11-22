@@ -8,8 +8,8 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, BOOST_TIME, CRASH_KEEP, DOOR_OPEN_AT, DRAW,
-                     FLAT_MAX, FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
+from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
+                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, lat_dist, wrap
 from .track import Track
@@ -46,6 +46,7 @@ class Game:
         self.flash = 0.0
         self.msg = ("", 0.0)
         self.heading = 0.0
+        self.dive = 0.0         # how far the track has tipped downhill lately (< 0: uphill)
         self.steer = 0.0
         self.t = 0.0
         self.sparks = []
@@ -153,6 +154,8 @@ class Game:
         off = lat_dist(self.theta, tr.line(seg), is_open) - LINE_TOL
         self.off_line = tr.bend(seg) * max(0.0, min(1.0, off / LINE_FALLOFF))
         self.heading += tr.curv[seg] * self.speed * dt / SEG
+        self.dive += tr.pitch[seg] * self.speed * dt / SEG
+        self.dive -= self.dive * min(1.0, dt / DIVE_SETTLE)
 
     def _shoot(self, dt, fire, pz):
         self.cooldown -= dt

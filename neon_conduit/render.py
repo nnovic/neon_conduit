@@ -10,10 +10,12 @@ import pygame
 
 from . import config
 from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
-                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, STAR_R,
+                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, OUTDOOR_THEMES, R, SEG, SIDES,
+                     SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
                        TUBE_XS, WALL_COLUMN, bank, clip, wall_xy, wrap)
+from . import decor
 from .palette import DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette
 from .patterns import BY_NAME
 
@@ -42,19 +44,27 @@ class Renderer:
         star_rng = random.Random(7)
         self.stars = [(star_rng.uniform(-900, 900), star_rng.uniform(-900, 900),
                        star_rng.randint(90, 230)) for _ in range(220)]
+        self.panoramas = decor.panoramas(OUTDOOR_THEMES, focal / FOCAL)
 
     def draw(self, game):
         """Draw the world as seen from behind game's sled (no HUD)."""
         self.game = game
         scr = self.screen
         tr = game.track
-        scr.fill(FOG)
-        self._camera(game)
-        self._stars(game)
-
         base = int(game.cam_z // SEG)
         frac = game.cam_z / SEG - base
         tr.ensure(base + DRAW + 2, game.level)
+        self._camera(game)
+        theme, self.fog_col = self._outdoors(tr, base)
+        # The track dipping or climbing tilts the view: the horizon rises or sinks.
+        k = self.focal / FOCAL
+        self.rise = -SKY_RISE_MAX * k * math.tanh(game.dive * SKY_RISE_GAIN / SKY_RISE_MAX)
+        if theme:
+            decor.draw(self, theme, game.heading, self.rise)
+        else:
+            scr.fill(FOG)
+            self._stars(game)
+
         self.base = base
         self._centre_line(tr, base, frac)
         rings, orings, frames = self._rings(tr, base, frac)
@@ -113,11 +123,29 @@ class Renderer:
         self.pcx, self.pcy = self.cx + ox_s, self.cy + oy_s
         self.f = self.focal * (0.88 if game.boost > 0 else 1.0)
 
+    def _outdoors(self, tr, base):
+        """The backdrop to show, and the colour of the fog.
+
+        An open run's backdrop shows while the run is in view; its haze takes over the fog
+        gradually as the run comes closer, and gives way again after it's left behind.
+        """
+        fade_in, fade_out = 30, 12                  # segments
+        ahead = next((i for i in range(DRAW) if tr.open[base + i]), None)
+        behind = next((j for j in range(1, fade_out + 1) if base >= j and tr.open[base - j]), None)
+        theme, haze, amount = None, FOG, 0.0
+        if ahead is not None:
+            theme = self.panoramas[tr.outdoor_theme(base + ahead)]
+            haze, amount = theme.fog, max(0.0, 1.0 - ahead / fade_in)
+        if behind is not None and 1.0 - behind / fade_out > amount:
+            haze, amount = self.panoramas[tr.outdoor_theme(base - behind)].fog, 1.0 - behind / fade_out
+        return theme, mix(FOG, haze, amount)
+
     def _stars(self, game):
-        """Stars, seen in open sections and at the far end of the tube."""
+        """Stars at the far end of the tube, when no outdoor backdrop is in view."""
         cr, sr, pcx, pcy = self.cr, self.sr, self.pcx, self.pcy
         hs = game.heading * 140.0
         for x, y, b in self.stars:
+            y += self.rise
             x = (x - hs + 900) % 1800 - 900
             sx = pcx + x * cr - y * sr
             sy = pcy + x * sr + y * cr
@@ -205,7 +233,7 @@ class Renderer:
                 c = FLOOR_COLS[band & 1]
             else:
                 c = mix(pal[0], pal[1], pattern.shade(si, WALL_COLUMN[s], self.game.t))
-            pygame.draw.polygon(self.screen, fogged(c, SIDE_LIGHT[s], fog),
+            pygame.draw.polygon(self.screen, fogged(c, SIDE_LIGHT[s], fog, self.fog_col),
                                 (r0[s], r0[s + 1], r1[s + 1], r1[s]))
 
     def _open_segment(self, tr, si, r0, r1, fog):
@@ -214,21 +242,21 @@ class Renderer:
         off = FLOOR_SIDES[0]
         for s in FLOOR_SIDES:
             c = GATE_GLOW if gate_glow else FLOOR_COLS[band & 1]
-            pygame.draw.polygon(self.screen, fogged(c, SIDE_LIGHT[s], fog),
+            pygame.draw.polygon(self.screen, fogged(c, SIDE_LIGHT[s], fog, self.fog_col),
                                 (r0[s - off], r0[s - off + 1], r1[s - off + 1], r1[s - off]))
         # Upright kerbs at the floor edges: too steep to ride up. Inner face, then top.
         c = GATE_GLOW if gate_glow else tr.kerb_col(si, band)
         nf = len(OPEN_X)
         for c, lt, quads in ((c, 0.72, ((0, nf), (nf - 1, nf + 1))),
                              (mix(c, (255, 250, 225), 0.35), 1.0, ((nf, nf + 2), (nf + 1, nf + 3)))):
-            col = fogged(c, lt, fog)
+            col = fogged(c, lt, fog, self.fog_col)
             for v, t in quads:
                 pygame.draw.polygon(self.screen, col, (r0[v], r0[t], r1[t], r1[v]))
 
     def _fast_line(self, tr, si, fog):
         """The fast line (developer mode): cyan while the sled is on it, amber when it has strayed."""
         c = (255, 170, 40) if self.game.off_line > 0.05 else (80, 230, 255)
-        col = fogged(c, 0.75 + 0.25 * ((si // 2) & 1), fog)
+        col = fogged(c, 0.75 + 0.25 * ((si // 2) & 1), fog, self.fog_col)
         fl = 1.0 if tr.open[si] else 0.0
         z0, a0, a1 = si * SEG, tr.line(si), tr.line(si + 1)
         proj = self.proj
@@ -342,9 +370,10 @@ class Renderer:
         fog = 0.6 * min(1.0, depth ** 1.3 * 1.15)   # lit doorway: shows through the haze
 
         def door_fog(c, lt=1.0):
-            return (int(c[0] * lt * (1 - fog) + FOG[0] * fog),
-                    int(c[1] * lt * (1 - fog) + FOG[1] * fog),
-                    int(c[2] * lt * (1 - fog) + FOG[2] * fog))
+            fc = self.fog_col
+            return (int(c[0] * lt * (1 - fog) + fc[0] * fog),
+                    int(c[1] * lt * (1 - fog) + fc[1] * fog),
+                    int(c[2] * lt * (1 - fog) + fc[2] * fog))
 
         dist = i * SEG - self.game.sled_z
         u = max(0.0, min(1.0, (DOOR_OPEN_AT - dist) / DOOR_SLIDE))

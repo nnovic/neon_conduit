@@ -20,6 +20,7 @@ Modules
     track       the endless, procedurally generated track
     game        game state and rules (no drawing, no keyboard)
     render      3D drawing of the world
+    decor       360-degree backdrops of the outdoor runs (images in assets/)
     hud         head-up display and title / game-over / pause screens
     audio       synthesized sound effects
     app         window, main loop and command line

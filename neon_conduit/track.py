@@ -3,7 +3,7 @@ import math
 import random
 
 from .config import (BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
-                     LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
+                     LINE_MAX, OPEN_CHANCE, OUTDOOR_THEMES, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
                      WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import kerb_cols
@@ -85,6 +85,11 @@ class Track:
         if run not in self.tube_styles:
             self.tube_styles[run] = random.Random(run * 104729 + 7).choice(PATTERNS).name
         return self.tube_styles[run]
+
+    def outdoor_theme(self, i):
+        """Name of the backdrop of the open run that segment i belongs to: one random theme
+        per run (kept off the track's own rng)."""
+        return random.Random(self.stretch[i] * 7349 + 3).choice(OUTDOOR_THEMES)
 
     def kerb_col(self, i, band):
         """Kerb colour in open segment i: one random scheme per open run, striped by band."""
