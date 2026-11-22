@@ -13,9 +13,9 @@ from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, F
                      FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
-                       TUBE_XS, bank, clip, wall_xy, wrap)
-from .palette import (DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette,
-                      tube_shade)
+                       TUBE_XS, WALL_COLUMN, bank, clip, wall_xy, wrap)
+from .palette import DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette
+from .patterns import BY_NAME
 
 
 def star_fan(radius):
@@ -196,15 +196,15 @@ class Renderer:
         band = si // 2
         gate_glow = si % GATE_SEGS in (0, GATE_SEGS - 1)
         # One colour scheme and pattern per stretch of tube: they only change out in the open.
-        style = tr.tube_style(si)
-        pal = tube_palette(tr.stretch[si], style)
+        pattern = BY_NAME[tr.tube_style(si)]
+        pal = tube_palette(tr.stretch[si], pattern.contrast)
         for s in range(SIDES):
             if gate_glow:
                 c = GATE_GLOW
             elif abs(SIDE_MID[s]) < FLOOR_A:
                 c = FLOOR_COLS[band & 1]
             else:
-                c = mix(pal[0], pal[1], tube_shade(style, si, s, self.game.t))
+                c = mix(pal[0], pal[1], pattern.shade(si, WALL_COLUMN[s], self.game.t))
             pygame.draw.polygon(self.screen, fogged(c, SIDE_LIGHT[s], fog),
                                 (r0[s], r0[s + 1], r1[s + 1], r1[s]))
 

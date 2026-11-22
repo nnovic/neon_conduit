@@ -1,5 +1,6 @@
 """Every tunable of the game in one place: screen, tube, track, physics and timing."""
 import math
+import os
 
 DEVELOPER_MODE = False  # True draws the fast line through bends on the track
 
@@ -18,6 +19,7 @@ FLOOR_A = math.pi / 4   # the tube is flat below this angle either side of the b
 FLOOR_Y = R * math.cos(FLOOR_A)
 FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
 FLAT_MAX = 1.4          # angles are clamped here when mapped onto an open section's flat floor
+PATTERNS_FILE = os.path.join(os.path.dirname(__file__), "conduit_patterns.txt")   # tunnel wall patterns
 
 # ----------------------------------------------------------------- camera
 PLAYER_D = 12.0         # how far ahead of the camera the sled sits

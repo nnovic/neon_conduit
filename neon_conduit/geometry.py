@@ -120,6 +120,10 @@ SIDE_MID = [SIDE_A[k] + math.pi / SIDES for k in range(SIDES)]           # side 
 # Sides lit from below so the floor reads brighter than the ceiling.
 SIDE_LIGHT = [0.62 + 0.38 * math.cos(m) for m in SIDE_MID]
 FLOOR_SIDES = [s for s in range(SIDES) if abs(SIDE_MID[s]) < FLOOR_A]
+# The other sides, in the order a pattern row lists them: from the left wall just above
+# the floor, up over the ceiling, then down the right wall.
+WALL_SIDES = list(reversed(range(FLOOR_SIDES[0]))) + list(reversed(range(FLOOR_SIDES[-1] + 1, SIDES)))
+WALL_COLUMN = {s: c for c, s in enumerate(WALL_SIDES)}
 # Floor vertices across an open section, as fractions of its half-width (-1 .. 1).
 OPEN_X = [math.tan(SIDE_A[v]) / math.tan(FLOOR_A)
           for v in range(FLOOR_SIDES[0], FLOOR_SIDES[-1] + 2)]

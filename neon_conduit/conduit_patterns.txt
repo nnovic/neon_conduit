@@ -1,0 +1,78 @@
+; Neon Conduit - tunnel wall patterns
+;
+; Each stretch of tunnel (between two outdoor runs) picks one of these at random,
+; and paints it in that stretch's colours. The floor is never patterned.
+;
+;   [name]            starts a pattern
+;   key = value       optional settings, before the rows:
+;                       scroll   = rows per second the pattern slides towards the
+;                                  sled (negative: away from it); default 0
+;                       contrast = strong (default) or soft: how far apart the
+;                                  pattern's two colours are
+;   ##..##..##..      one row per track segment; the rows repeat down the tunnel,
+;                     each row the next segment further ahead
+;
+; A row has 12 characters, one per wall panel, going round the tube as you look
+; ahead: from the left wall just above the floor, up over the ceiling, then down
+; the right wall to the floor.
+;   .     the stretch's dark colour
+;   #     its light colour
+;   0-9   in between: 0 is dark, 9 is light
+;
+; Everything after a ; is a comment.
+
+[checker]
+contrast = soft
+#.#.#.#.#.#.
+#.#.#.#.#.#.
+.#.#.#.#.#.#
+.#.#.#.#.#.#
+
+[rings]                 ; bands round the tube: circles down the middle
+............
+............
+............
+############
+############
+############
+
+[stripes]               ; dashed lines along the tube, staggered side to side
+#.#.#.#.#.#.
+#...#...#...
+#...#...#...
+#.#.#.#.#.#.
+..#...#...#.
+..#...#...#.
+
+[chevrons]              ; V shapes, mirrored left and right
+##..####..##
+#..##..##..#
+..##....##..
+.##..##..##.
+
+[whirl]                 ; barber pole: two diagonal stripes winding down the tube
+....##......
+.....##.....
+......##....
+#......##...
+##......##..
+.##......##.
+..##......##
+...##......#
+
+;[pulse]                 ; soft waves rushing towards the sled
+;scroll = 15.6
+;444444444444
+;999999999999
+;999999999999
+;999999999999
+;999999999999
+;999999999999
+;999999999999
+;555555555555
+;000000000000
+;000000000000
+;000000000000
+;000000000000
+;000000000000
+;000000000000

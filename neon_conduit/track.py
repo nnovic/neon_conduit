@@ -6,7 +6,8 @@ from .config import (BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_
                      LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
                      WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
-from .palette import TUBE_STYLES, kerb_cols
+from .palette import kerb_cols
+from .patterns import PATTERNS
 
 
 class Track:
@@ -79,10 +80,10 @@ class Track:
         return self.door_angles[i]
 
     def tube_style(self, i):
-        """Wall pattern of tube segment i: one random style per stretch of tube."""
+        """Name of the wall pattern of tube segment i: one random pattern per stretch of tube."""
         run = self.stretch[i]
         if run not in self.tube_styles:
-            self.tube_styles[run] = random.Random(run * 104729 + 7).choice(TUBE_STYLES)
+            self.tube_styles[run] = random.Random(run * 104729 + 7).choice(PATTERNS).name
         return self.tube_styles[run]
 
     def kerb_col(self, i, band):
