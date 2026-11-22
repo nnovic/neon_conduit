@@ -21,8 +21,10 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-import pygame                     # noqa: E402
-import neon_conduit as nc         # noqa: E402
+import pygame                                                      # noqa: E402
+from neon_conduit import Track                                     # noqa: E402
+from neon_conduit.app import App                                   # noqa: E402
+from neon_conduit.config import BOOST_MULT, GATE_SEGS, PLAYER_D, SEG   # noqa: E402
 
 VW, VH, FPS = 1080, 1920, 30
 STEPS = 2                         # physics steps (at 60 Hz) per video frame
@@ -37,18 +39,14 @@ PINK = (255, 60, 170)
 CYAN = (70, 230, 255)
 GREEN = (110, 255, 150)
 WHITE = (255, 255, 255)
-
-# Portrait camera: same engine, taller screen.
-nc.W, nc.H = VW, VH
-nc.CX, nc.CY = VW // 2, int(VH * 0.5)
-nc.FOCAL = 760.0
+PORTRAIT = {"size": (VW, VH), "focal": 760.0, "horizon": 0.5}   # same engine, taller screen
 
 
 # ------------------------------------------------------------------ world
 def world(drones=False):
     """A fresh, fully generated track (each clip gets its own, untouched by the others).
     Drones are cleared unless asked for: a crash would kill the shot."""
-    tr = nc.Track(random.Random(SEED))
+    tr = Track(random.Random(SEED))
     tr.ensure(6000, LEVEL)
     if not drones:
         tr.objects = [o for o in tr.objects if o["kind"] != "drone"]
@@ -73,8 +71,7 @@ def place(g, tr, seg, speed_mult=1.0):
     g.state = "play"
     g.track = tr
     g.level = LEVEL
-    pz = seg * nc.SEG
-    g.cam_z = pz - nc.PLAYER_D
+    g.cam_z = seg * SEG - PLAYER_D
     g.theta = g.roll = tr.line(seg)
     g.flat = 1.0 if tr.open[seg] else 0.0
     g.speed = g.max_speed * speed_mult
@@ -82,12 +79,11 @@ def place(g, tr, seg, speed_mult=1.0):
 
 
 def step(g, shoot=False):
-    keys = pygame.key.get_pressed()
     for _ in range(STEPS):
         if not shoot:
             g.cooldown = 1e9
             g.bullets = []
-        g.update(1.0 / (FPS * STEPS), keys, auto=True)
+        g.update(1.0 / (FPS * STEPS), g.autopilot())
 
 
 # ------------------------------------------------------------------ text
@@ -144,9 +140,10 @@ def blit_pop(scr, surf, centre, age, life, pop=0.18):
 class Ad:
     def __init__(self, out_pipe, preview):
         pygame.init()
-        self.g = nc.Game(SEED)
-        self.g.draw_hud = lambda: None          # the ad draws its own overlays
-        self.scr = self.g.screen
+        app = App(SEED, **PORTRAIT)
+        self.g = app.game
+        self.renderer = app.renderer            # world only: the ad draws its own overlays
+        self.scr = app.screen
         self.txt = Text()
         self.pipe = out_pipe
         self.preview = preview
@@ -186,7 +183,7 @@ class Ad:
             t = f / FPS
             step(self.g, shoot)
             self.g.time_left = max(self.g.time_left, 0.5) if clock else 99.0
-            self.g.draw()
+            self.renderer.draw(self.g)
             self.vignette()
             for surf, start, life, y in captions:
                 blit_pop(self.scr, surf, (VW // 2, y), t - start, life)
@@ -199,7 +196,7 @@ class Ad:
         tr = world()
         a, b = max(runs_of(tr, False, 40), key=lambda r: r[1] - r[0])
         tr.tube_styles[tr.stretch[a]] = "whirl"
-        place(self.g, tr, a + 8, nc.BOOST_MULT)
+        place(self.g, tr, a + 8, BOOST_MULT)
         self.g.boost = 99.0
         t = self.txt
         caps = [(t.neon("HOW FAST", 150, PINK), 0.0, 1.5, 420),
@@ -253,7 +250,7 @@ class Ad:
             tr = world(drones=True)
             if any(tr.open[start:start + 90]):
                 continue
-            ahead = [o for o in tr.objects if o["kind"] == "drone" and start * nc.SEG < o["z"] < start * nc.SEG + 450]
+            ahead = [o for o in tr.objects if o["kind"] == "drone" and start * SEG < o["z"] < start * SEG + 450]
             if len(ahead) < 3:
                 continue
             place(self.g, tr, start)
@@ -275,7 +272,7 @@ class Ad:
 
     def gate(self):
         tr = world()
-        gates = [k * nc.GATE_SEGS for k in range(1, 20) if not tr.open[k * nc.GATE_SEGS]]
+        gates = [k * GATE_SEGS for k in range(1, 20) if not tr.open[k * GATE_SEGS]]
         gz = gates[1]
         tr.tube_styles[tr.stretch[gz]] = "rings"
         place(self.g, tr, gz - 44)
@@ -314,7 +311,7 @@ class Ad:
             tc = f / FPS
             step(self.g)
             self.g.time_left = 99.0
-            self.g.draw()
+            self.renderer.draw(self.g)
             dim.set_alpha(int(200 * ease_out(tc / 0.6)))
             self.scr.blit(dim, (0, 0))
             blit_pop(self.scr, logo1, (VW // 2, 720), tc - 0.15, 99)
@@ -461,6 +458,7 @@ def main():
          "avenc_aac", "bitrate=192000", "!", "queue", *unbounded, "!", "m.",
          "mp4mux", "name=m", "faststart=true", "!", "filesink", "location=" + out],
         stdin=subprocess.PIPE)
+    random.seed(0)                 # the sled's flame flicker uses the global generator
     secs = Ad(enc.stdin, args.preview).run()
     enc.stdin.close()
     if enc.wait():
