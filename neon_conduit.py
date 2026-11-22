@@ -22,6 +22,8 @@ from array import array
 
 import pygame
 
+DEVELOPER_MODE = False  # True draws the fast line through bends on the track
+
 W, H = 1024, 640
 CX, CY = W // 2, int(H * 0.47)
 FOCAL = 600.0
@@ -50,8 +52,8 @@ DOOR_COL = (70, 78, 112)
 DOOR_EDGE = (255, 200, 60)
 
 # The fast line through a bend runs up the outside, further out the tighter the bend.
-LINE_GAIN = 3.0     # wall angle of the line per unit of curvature
-LINE_MAX = 1.2      # ...up to this angle
+LINE_GAIN = 4.5     # wall angle of the line per unit of curvature
+LINE_MAX = 1.8      # ...up to this angle
 LINE_BEND = 0.12    # curvature at which straying from the line costs full price
 LINE_TOL = 2.5      # sideways distance from the line that is still free
 LINE_FALLOFF = 8.0  # further distance over which the penalty grows to its maximum
@@ -807,7 +809,7 @@ class Game:
                                int(c[2] * lt + FOG[2] * fog))
                         for v, t in quads:
                             polygon(scr, col, (r0[v], r0[t], r1[t], r1[v]))
-                if tr.bend(si) > 0.25:
+                if DEVELOPER_MODE and tr.bend(si) > 0.25:
                     # The fast line: cyan while the sled is on it, amber when it has strayed.
                     c = (255, 170, 40) if self.off_line > 0.05 else (80, 230, 255)
                     lt = (0.75 + 0.25 * (band & 1)) * (1 - fog)
@@ -991,7 +993,7 @@ class Game:
         if self.state == "title":
             self.text(self.big, "NEON CONDUIT", (mid, 190), (255, 80, 160), center=True)
             lines = ["Reach each gate before the clock runs out.",
-                     "Follow the cyan line through bends: off it, you lose speed.",
+                     "Ride high round the outside of bends, or you lose speed.",
                      "",
                      "Left / Right  steer      Down  brake      Space  fire",
                      "P  pause      Esc  quit",
