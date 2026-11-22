@@ -10,7 +10,7 @@ import pygame
 
 from . import config
 from .config import (BOOST_HW, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y, FOCAL, GATE_SEGS,
-                     HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, WALL_H, WALL_T, CAM_H, CAM_LAG)
+                     HORIZON, LINE_HW, NEAR, R, SEG, SIDES, SLED_HW, STAR_H, WALL_H, WALL_T, CAM_H, CAM_LAG)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
                        TUBE_XS, bank, clip, wall_xy, wrap)
 from .palette import (DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette,
@@ -66,6 +66,8 @@ class Renderer:
                     self._fast_line(tr, si, fog)
             for o in buckets.get(si, ()):
                 self._object(o)
+            if tr.has_star(si) and si not in game.stars_taken:
+                self._hint_star(tr, si)
             if tr.is_door(si) and (i - frac) * SEG > NEAR:
                 self._door(frames[i], si, max(0.0, i - frac) / DRAW)
 
@@ -255,6 +257,17 @@ class Renderer:
             if all(pts):
                 pygame.draw.lines(scr, (255, 255, 160), False, [p[:2] for p in pts],
                                   max(2, int(pts[0][2] * 0.5)))
+        elif kind == "sparkle":                               # hint star picked up
+            p = proj(z, o["a"], 0.0, STAR_H, True)
+            if p:
+                t = o["age"] / 0.45
+                r = p[2] * (0.8 + 2.5 * t)
+                col = mix((255, 255, 230), (255, 200, 60), t)
+                for j in range(8):
+                    ang = j * math.pi / 4
+                    pygame.draw.line(scr, col, (p[0] + 0.4 * r * math.cos(ang), p[1] + 0.4 * r * math.sin(ang)),
+                                     (p[0] + r * math.cos(ang), p[1] + r * math.sin(ang)),
+                                     max(1, int(p[2] * 0.25 * (1 - t)) + 1))
         elif "age" in o:                                      # explosion
             p = proj(z, o["a"], 0.0, 1.5, True)
             if p:
@@ -265,6 +278,26 @@ class Renderer:
             p0, p1 = proj(z, o["a"], 0.0, 1.0, True), proj(z + 5, o["a"], 0.0, 1.0, True)
             if p0 and p1:
                 pygame.draw.line(scr, (255, 255, 120), p0[:2], p1[:2], max(2, int(p0[2] * 0.12)))
+
+    def _hint_star(self, tr, si):
+        """A twinkling five-pointed star floating over the fast line at segment si."""
+        z = si * SEG
+        p = self.proj(z, tr.line(si), 0.0, STAR_H, True, 1.0 if tr.open[si] else 0.0)
+        if not p:
+            return
+        t = self.game.t
+        r = p[2] * 0.9 * (1.0 + 0.15 * math.sin(t * 8 + si))
+        spin = t * 2.0 + si
+        pts = []
+        for j in range(10):
+            ang = spin + j * math.pi / 5
+            rr = r if j % 2 == 0 else r * 0.45
+            pts.append((p[0] + rr * math.sin(ang), p[1] - rr * math.cos(ang)))
+        if r > 3:
+            pygame.draw.circle(self.screen, (120, 90, 20), (p[0], p[1]), r * 0.8)   # glow
+        pygame.draw.polygon(self.screen, (255, 225, 80), pts)
+        if r > 6:
+            pygame.draw.polygon(self.screen, (255, 255, 230), pts, max(1, int(r * 0.08)))
 
     def _door(self, frame, i, depth):
         """Sliding door across the mouth of segment i; it parts as the sled draws near.

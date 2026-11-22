@@ -51,7 +51,7 @@ class Hud:
         if game.state == "title":
             self.text(self.big, "NEON CONDUIT", (mid, 190), (255, 80, 160), center=True)
             lines = ["Reach each gate before the clock runs out.",
-                     "Ride high round the outside of bends, or you lose speed.",
+                     "Follow the stars round the outside of bends, or you lose speed.",
                      "",
                      "Left / Right  steer      Down  brake      Space  fire",
                      "P  pause      Esc  quit",

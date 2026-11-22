@@ -2,8 +2,9 @@
 import math
 import random
 
-from .config import (BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN, LINE_MAX,
-                     OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
+from .config import (BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
+                     LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY,
+                     WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import TUBE_STYLES, kerb_cols
 
@@ -54,6 +55,10 @@ class Track:
     def bend(self, i):
         """0 on a straight, 1 in a proper bend."""
         return min(1.0, abs(self.curv[i]) / LINE_BEND)
+
+    def has_star(self, i):
+        """True where a hint star floats over the fast line at the start of segment i."""
+        return i % STAR_EVERY == 0 and self.bend(i) >= STAR_BEND
 
     def hw_at(self, z):
         """Floor half-width at depth z."""
@@ -133,7 +138,7 @@ class Track:
         if empty:
             return
 
-        n_boost = rng.randint(1, 2)
+        n_boost = 1 if rng.random() < BOOST_CHANCE else 0
         n_drone = rng.randint(0, min(3, 1 + level // 3))
         slots = rng.sample(range(3, n - 2), n_boost + n_drone)
         for i, j in enumerate(slots):

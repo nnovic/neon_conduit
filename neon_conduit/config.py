@@ -46,10 +46,16 @@ LINE_TOL = 2.5          # sideways distance from the line that is still free
 LINE_FALLOFF = 8.0      # further distance over which the penalty grows to its maximum
 LINE_SLOW = 0.35        # fraction of top speed lost when far off the line in a bend
 LINE_HW = 0.35          # half-width of the line as drawn in developer mode
+# Hint stars float above the fast line through bends, showing the way.
+STAR_EVERY = 3          # one star every this many segments...
+STAR_BEND = 0.5         # ...where the bend is at least this sharp (see Track.bend)
+STAR_H = 1.3            # height above the surface
+STAR_SCORE = 25         # points for riding through one
 
 # ---------------------------------------------------------------- objects
 SLED_HW = 1.5           # half-widths, in world units
 BOOST_HW = 2.2
+BOOST_CHANCE = 0.375    # chance that a section gets a boost pad (one at most)
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed
 

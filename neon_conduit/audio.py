@@ -22,6 +22,7 @@ class Audio:
                 "gate": self._sweep(500, 1300, 0.45, 0.3),
                 "scrape": self._noise(0.14, 0.22),
                 "door": self._sweep(160, 60, 0.6, 0.18),
+                "star": self._sweep(1400, 2100, 0.07, 0.12),
             }
             self.ok = True
         except pygame.error:

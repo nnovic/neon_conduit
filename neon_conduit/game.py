@@ -10,7 +10,7 @@ from collections import namedtuple
 from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, CRASH_KEEP, DOOR_OPEN_AT, DRAW, FLAT_MAX,
                      FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
-                     SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, START_TIME)
+                     SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, lat_dist, wrap
 from .track import Track
 
@@ -40,6 +40,7 @@ class Game:
         self.score = 0
         self.bullets = []
         self.effects = []
+        self.stars_taken = set()    # segments whose hint star the sled has ridden through
         self.cooldown = 0.0
         self.shake = 0.0
         self.flash = 0.0
@@ -76,6 +77,7 @@ class Game:
         self._steer(dt, controls.steer, pz, seg)
         self._shoot(dt, controls.fire, pz)
         self._objects(dt, pz)
+        self._hint_stars(pz)
         self._effects(dt)
 
         self.score += int(self.speed * dt)
@@ -211,6 +213,17 @@ class Game:
             if alive:
                 keep.append(o)
         tr.objects = keep
+
+    def _hint_stars(self, pz):
+        """Ride through a hint star (on the fast line) to pick it up."""
+        tr = self.track
+        for i in range(int(self.prev_z // SEG) + 1, int(pz // SEG) + 1):
+            if (tr.has_star(i) and i not in self.stars_taken
+                    and lat_dist(self.theta, tr.line(i), tr.open[i]) < LINE_TOL):
+                self.stars_taken.add(i)
+                self.score += STAR_SCORE
+                self.effects.append({"kind": "sparkle", "z": i * SEG, "a": tr.line(i), "age": 0.0})
+                self.audio.play("star")
 
     def _effects(self, dt):
         """Age explosions and sparks."""
