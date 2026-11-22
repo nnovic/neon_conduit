@@ -1,0 +1,11 @@
+# Neon Conduit: pip install -r requirements.txt
+#
+# pygame-ce (the community edition of pygame) - developed and tested on 2.5.8.
+# Don't install the original "pygame" package alongside it: both provide the
+# same "pygame" module and clash.
+pygame-ce>=2.5,<3
+
+# promo/make_ad.py also needs GStreamer, which is a system package, not a pip one:
+#   gst-launch-1.0 with the x264enc, avenc_aac (gst-libav) and mp4mux elements,
+#   e.g. on Debian/Ubuntu: gstreamer1.0-tools gstreamer1.0-plugins-good
+#   gstreamer1.0-plugins-ugly gstreamer1.0-libav
