@@ -11,13 +11,28 @@ import pygame
 from . import config
 from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
                      FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, OUTDOOR_THEMES, R, SEG, SIDES,
-                     SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, STAR_R,
+                     SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, SPEED_CAP, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
                        TUBE_XS, WALL_COLUMN, bank, clip, wall_xy, wrap)
 from . import decor
 from .palette import DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette
 from .patterns import BY_NAME
+from .model import DEFAULT, MATERIALS, load_obj
+
+SHIP = load_obj("ship.obj")
+SHIP_HOVER = 0.15           # gap between the ship and the surface
+SHIP_PIVOT = 0.5            # height the ship banks round
+SHIP_WINDING = 1            # sign of a face's screen-space area when it faces the camera
+SHIP_WINDING_N = 1          # sign that turns the model's face normals outward
+_l = (-0.45, 0.8, -0.4)     # light: from above, a little left and behind
+SHIP_LIGHT = tuple(c / math.sqrt(sum(c * c for c in _l)) for c in _l)
+FLAME_BASE = 0.4            # exhaust flame length when standing still
+FLAME_STRETCH = 3.0         # ...plus this much at top cruising speed
+FLAME_BOOST = 2.2           # ...and the stretch is this much longer while boosting
+FLAME_CLEAR = 4.5           # flame tips never come closer to the camera than this
+# Flame layers, drawn outermost first: (length, width, how far towards white).
+FLAME_LAYERS = ((1.15, 1.9, 0.0), (1.0, 1.0, 0.35), (0.55, 0.45, 0.85))
 
 
 def star_fan(radius):
@@ -408,24 +423,78 @@ class Renderer:
         pygame.draw.lines(self.screen, door_fog((255, 80, 160)), True, to_screen(shape), max(1, int(k * 0.35)))
 
     def _sled(self, game):
+        """The racer: the ship model, banked into the steering and hovering a little,
+        projected vertex by vertex and painted far faces first."""
         scr, proj = self.screen, self.proj
         pz, a, fl = game.sled_z, game.theta, game.flat
-        rl = proj(pz - 1.5, a, -SLED_HW, 0.25, True, fl)
-        rr = proj(pz - 1.5, a, SLED_HW, 0.25, True, fl)
-        nose = proj(pz + 4.5, a, 0.0, 0.45, True, fl)
-        fin = proj(pz - 1.5, a, -game.steer * 0.6, 1.6, True, fl)
-        if not (rl and rr and nose and fin):
-            return
-        rl, rr, nose, fin = rl[:2], rr[:2], nose[:2], fin[:2]
+        roll = -0.35 * game.steer
+        cr, sr = math.cos(roll), math.sin(roll)
+        lift = SHIP_HOVER + 0.05 * math.sin(game.t * 7.0)
+        pts, scr_pts = [], []
+        for x, y, z in SHIP.verts:
+            y -= SHIP_PIVOT                                       # bank round a point mid-height
+            x, y = x * cr - y * sr, x * sr + y * cr
+            y += SHIP_PIVOT + lift
+            p = proj(pz + z, a, x, y, True, fl)
+            if not p:
+                return
+            pts.append((x, y, z))
+            scr_pts.append(p)
+
         hot = game.boost > 0
-        flame = (120, 255, 160) if hot else (90, 180, 255)
-        tail = proj(pz - (5.0 if hot else 3.0) - random.random(), a, 0.0, 0.7, True, fl)
-        if tail:
-            pygame.draw.polygon(scr, flame, (rl, rr, tail[:2]))
-        pygame.draw.polygon(scr, (200, 205, 220), (rl, nose, fin))
-        pygame.draw.polygon(scr, (120, 125, 150), (rr, nose, fin))
-        pygame.draw.polygon(scr, (40, 44, 70), (rl, rr, fin))
-        pygame.draw.lines(scr, (255, 80, 160), True, (rl, nose, rr), 2)
+        flame = (60, 255, 140) if hot else (60, 150, 255)
+        # Exhaust flames first, one per nozzle: they trail behind the ship, so it covers them.
+        # They stretch with speed, much further on boost, and flicker: a wide outer glow,
+        # the flame, and a white-hot core.
+        s = game.speed / SPEED_CAP
+        length = FLAME_BASE + FLAME_STRETCH * s * (FLAME_BOOST if hot else 1.0)
+        length *= 1.0 + (0.35 if hot else 0.2) * random.random()
+        nearest = game.cam_z + FLAME_CLEAR                       # tails stop short of the camera
+        for idx, mat in SHIP.faces:
+            if mat != "glow":
+                continue
+            cx, cy, cz = (sum(pts[i][c] for i in idx) / len(idx) for c in range(3))
+            corners = [scr_pts[i][:2] for i in idx]
+            mx = sum(p[0] for p in corners) / len(corners)
+            my = sum(p[1] for p in corners) / len(corners)
+            for f_len, f_wide, f_white in FLAME_LAYERS:
+                tail = proj(max(nearest, pz + cz - length * f_len), a, cx, cy, True, fl)
+                if not tail:
+                    continue
+                base = [(mx + (x - mx) * f_wide, my + (y - my) * f_wide) for x, y in corners]
+                col = mix(flame, (255, 255, 255), f_white)
+                for i in range(len(base)):
+                    pygame.draw.polygon(scr, col, (base[i], base[i - 1], tail[:2]))
+
+        faces = []
+        for idx, mat in SHIP.faces:
+            s = [scr_pts[i] for i in idx]
+            # Facing the camera? Screen-space winding tells, perspective included.
+            area = sum(s[i - 1][0] * s[i][1] - s[i][0] * s[i - 1][1] for i in range(len(s)))
+            if area * SHIP_WINDING <= 0:
+                continue
+            # Glowing nozzles are decals on the hull: paint them last. Otherwise far first
+            # (a small projection scale means far away).
+            faces.append((mat == "glow", sum(p[2] for p in s) / len(s), idx, mat, s))
+        faces.sort(key=lambda f: f[:2])
+        for _, _, idx, mat, s in faces:
+            col, lit = MATERIALS.get(mat, DEFAULT)
+            if mat == "glow":
+                col = flame
+            if lit:
+                p0, p1, p2 = pts[idx[0]], pts[idx[1]], pts[idx[2]]
+                u = (p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2])
+                v = (p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2])
+                n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+                ln = math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]) or 1.0
+                d = (n[0] * SHIP_LIGHT[0] + n[1] * SHIP_LIGHT[1] + n[2] * SHIP_LIGHT[2]) / ln
+                shade = 0.38 + 0.62 * max(0.0, d * SHIP_WINDING_N)
+                col = (int(col[0] * shade), int(col[1] * shade), int(col[2] * shade))
+            poly = [p[:2] for p in s]
+            pygame.draw.polygon(scr, col, poly)
+            pygame.draw.polygon(scr, (col[0] // 2, col[1] // 2, col[2] // 2), poly, 1)
+        for idx, mat in SHIP.lines:                              # neon edges, on top of it all
+            pygame.draw.lines(scr, MATERIALS.get(mat, DEFAULT)[0], False, [scr_pts[i][:2] for i in idx], 2)
 
     def _sparks(self, game):
         proj = self.proj

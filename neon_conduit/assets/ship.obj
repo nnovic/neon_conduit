@@ -1,0 +1,20 @@
+# Neon Conduit racer, written by tools/make_ship.py
+v -1.500 0.250 -1.500
+v 1.500 0.250 -1.500
+v 0.000 0.320 4.500
+v 0.000 1.250 -1.500
+v -0.450 0.340 -1.520
+v 0.450 0.340 -1.520
+v 0.000 0.800 -1.520
+usemtl body
+f 1 3 4
+usemtl body
+f 2 4 3
+usemtl dark
+f 1 4 2
+usemtl dark
+f 1 2 3
+usemtl glow
+f 5 7 6
+usemtl neon
+l 1 3 2
