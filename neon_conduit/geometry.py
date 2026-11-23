@@ -51,9 +51,12 @@ def lat_pos(a, flat=False):
 PERIMETER = 2 * (FLOOR_Y * math.tan(FLOOR_A) + R * (math.pi - FLOOR_A))
 
 
-def lat_dist(a1, a2, flat=False):
-    """Sideways distance between two wall angles, in world units."""
-    d = abs(lat_pos(a1, flat) - lat_pos(a2, flat))
+def lat_dist(a1, a2, flat=False, off=0.0):
+    """Sideways distance between two wall angles, in world units.
+
+    off: shifts a1 that many units sideways along the surface first.
+    """
+    d = abs(lat_pos(a1, flat) + off - lat_pos(a2, flat)) % PERIMETER
     return min(d, PERIMETER - d)
 
 

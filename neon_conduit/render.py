@@ -318,7 +318,7 @@ class Renderer:
                 pygame.draw.circle(scr, mix((255, 255, 200), (255, 60, 0), t), p[:2],
                                    max(2, p[2] * (0.6 + 3.5 * t)), max(1, int(p[2] * 0.5 * (1 - t)) + 1))
         else:                                                 # bullet
-            p0, p1 = proj(z, o["a"], 0.0, 1.0, True), proj(z + 11, o["a"], 0.0, 1.0, True)
+            p0, p1 = proj(z, o["a"], o["lat"], 1.0, True), proj(z + 11, o["a"], o["lat"], 1.0, True)
             if p0 and p1:
                 w = max(4, int(p0[2] * 0.26))
                 pygame.draw.line(scr, (255, 220, 60), p0[:2], p1[:2], w)

@@ -65,6 +65,7 @@ STAR_SCORE = 25         # points for riding through one
 # ---------------------------------------------------------------- objects
 SLED_HW = 1.5           # half-widths, in world units
 BOOST_HW = 2.2
+GUN_SPREAD = 1.2        # each twin gun sits this far left / right of the sled's middle
 BOOST_CHANCE = 0.375    # chance that a section gets a boost pad (one at most)
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed

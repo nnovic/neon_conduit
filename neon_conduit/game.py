@@ -9,7 +9,7 @@ from collections import namedtuple
 
 from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
-                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
+                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, GUN_SPREAD, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, lat_dist, wrap
 from .track import Track
@@ -161,7 +161,8 @@ class Game:
         self.cooldown -= dt
         if fire and self.cooldown <= 0:
             self.cooldown = 0.16
-            self.bullets.append({"z": pz + 3, "pz": pz + 3, "a": self.theta, "life": 0.9})
+            for side in (-GUN_SPREAD, GUN_SPREAD):              # twin guns, side by side
+                self.bullets.append({"z": pz + 3, "pz": pz + 3, "a": self.theta, "lat": side, "life": 0.9})
             self.audio.play("shot")
         for b in self.bullets:
             b["pz"] = b["z"]
@@ -187,7 +188,7 @@ class Game:
                     lim = floor_limit(1.0, tr.hw_at(z))
                     o["a"] = max(-lim, min(lim, o["a"]))
                 for b in self.bullets:
-                    if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"], flat) < 3.0:
+                    if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"], flat, b["lat"]) < 3.0:
                         b["life"] = 0
                         alive = False
                         self.score += 500
