@@ -2,6 +2,7 @@
 import pygame
 
 from .config import GATE_SEGS, SEG
+from .speedo import H as SPEEDO_H, W as SPEEDO_W, Speedo
 
 TEXT = (235, 240, 255)
 
@@ -13,6 +14,7 @@ class Hud:
         self.font = pygame.font.Font(None, 30)
         self.big = pygame.font.Font(None, 84)
         self.mid = pygame.font.Font(None, 44)
+        self.speedo = Speedo()
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -33,9 +35,7 @@ class Hud:
         self.text(self.mid, "%04.1f" % game.time_left, (w // 2, 30), tcol, center=True)
         self.text(self.font, "SCORE %07d" % game.score, (20, 16))
         self.text(self.font, "GATE %d" % game.level, (20, 44))
-        spd = "%3d km/h" % int(game.speed * 4)
-        self.text(self.font, spd, (w - 150, 16), (120, 255, 160) if game.boost > 0 else
-                  (255, 170, 40) if game.off_line > 0.05 else TEXT)
+        self.speedo.draw(self.screen, (w - SPEEDO_W - 8, self.h - SPEEDO_H - 8), game)
         prog = (game.sled_z / SEG % GATE_SEGS) / GATE_SEGS
         pygame.draw.rect(self.screen, (40, 44, 70), (w // 2 - 150, 56, 300, 8))
         pygame.draw.rect(self.screen, (255, 255, 160), (w // 2 - 150, 56, int(300 * prog), 8))
