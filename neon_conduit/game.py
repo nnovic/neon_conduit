@@ -8,13 +8,14 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
+from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
                      DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, GUN_SPREAD, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
-from .geometry import bank, floor_limit, lat_dist, wrap
+from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
 
-Controls = namedtuple("Controls", "steer brake fire")   # steer: -1 .. 1, brake / fire: bool
+# steer: -1 .. 1, brake / fire: bool, aim: -1 (lowered) .. 0 (along the slope) .. 1 (raised)
+Controls = namedtuple("Controls", "steer brake fire aim", defaults=(0,))
 IDLE = Controls(0, False, False)
 
 
@@ -42,6 +43,7 @@ class Game:
         self.effects = []
         self.stars_taken = set()    # segments whose hint star the sled has ridden through
         self.cooldown = 0.0
+        self.aim = 0.0          # gun elevation off the track slope, -1 (low) .. 1 (high)
         self.shake = 0.0
         self.flash = 0.0
         self.msg = ("", 0.0)
@@ -76,6 +78,7 @@ class Game:
         pz = self.sled_z
         seg = int(pz // SEG)
         self._steer(dt, controls.steer, pz, seg)
+        self.aim += max(-AIM_RATE * dt, min(AIM_RATE * dt, controls.aim - self.aim))
         self._shoot(dt, controls.fire, pz)
         self._objects(dt, pz)
         self._hint_stars(pz)
@@ -162,13 +165,41 @@ class Game:
         if fire and self.cooldown <= 0:
             self.cooldown = 0.16
             for side in (-GUN_SPREAD, GUN_SPREAD):              # twin guns, side by side
-                self.bullets.append({"z": pz + 3, "pz": pz + 3, "a": self.theta, "lat": side, "life": 0.9})
+                x, y = wall_xy(self.theta, side, 1.0, True, self.flat)
+                ux, uy = wall_xy(self.theta, side, 2.0, True, self.flat)   # one unit up from the sled
+                lift = self.aim * AIM_SLOPE * SEG                        # sideways drift per segment
+                self.bullets.append({"z": pz + 3, "pz": pz + 3, "x": x, "y": y,
+                                     "vx": (ux - x) * lift, "vy": (uy - y) * lift, "life": 0.9})
             self.audio.play("shot")
         for b in self.bullets:
             b["pz"] = b["z"]
-            b["z"] += (self.speed + 260.0) * dt
+            self._fly(b, (self.speed + 260.0) * dt)
             b["life"] -= dt
         self.bullets = [b for b in self.bullets if b["life"] > 0]
+
+    def _fly(self, b, dz):
+        """Move a bullet dz along the track in a straight line, so it does not follow the bends.
+
+        Bullets live in the cross-section frame, which turns with the track: x, y is the offset
+        from the tube centre and vx, vy its drift per segment. A shot leaves along the slope
+        where it was fired (raised by the aim); at each ring the track turns by curv / pitch,
+        so the straight shot drifts that much the other way. Hitting the wall ends it.
+        """
+        tr = self.track
+        z, end = b["z"], b["z"] + dz
+        while z < end:
+            s = int(z // SEG)
+            nxt = min(end, (s + 1) * SEG)
+            f = (nxt - z) / SEG
+            b["x"] += b["vx"] * f
+            b["y"] += b["vy"] * f
+            z = nxt
+            if z >= (s + 1) * SEG:
+                b["vx"] -= tr.curv[s]
+                b["vy"] -= tr.pitch[s]
+        b["z"] = end
+        if not inside(b["x"], b["y"], tr.open[int(end // SEG)]):
+            b["life"] = 0
 
     def _objects(self, dt, pz):
         """Drones, boost pads and gates: movement, hits and pick-ups."""
@@ -187,8 +218,10 @@ class Game:
                 if flat:
                     lim = floor_limit(1.0, tr.hw_at(z))
                     o["a"] = max(-lim, min(lim, o["a"]))
+                ox, oy = wall_xy(o["a"], 0.0, 1.5, True, 1.0 if flat else 0.0)
                 for b in self.bullets:
-                    if b["pz"] - 2 <= z <= b["z"] + 2 and lat_dist(b["a"], o["a"], flat, b["lat"]) < 3.0:
+                    if (b["life"] > 0 and b["pz"] - 2 <= z <= b["z"] + 2
+                            and math.hypot(b["x"] - ox, b["y"] - oy) < 3.0):
                         b["life"] = 0
                         alive = False
                         self.score += 500

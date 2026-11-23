@@ -11,9 +11,13 @@ from .render import Renderer
 
 
 def read_controls(keys, fire):
-    """Controls from the keyboard state (arrows or A / D / S); fire: Space was pressed this frame."""
+    """Controls from the keyboard state (arrows or A / D, S); fire: Space was pressed this frame.
+
+    Shots leave along the track's slope; Down raises the guns above it, Up lowers them.
+    """
     steer = (keys[pygame.K_RIGHT] or keys[pygame.K_d]) - (keys[pygame.K_LEFT] or keys[pygame.K_a])
-    return Controls(steer, keys[pygame.K_DOWN] or keys[pygame.K_s], fire)
+    aim = keys[pygame.K_DOWN] - keys[pygame.K_UP]
+    return Controls(steer, keys[pygame.K_s], fire, aim)
 
 
 class App:

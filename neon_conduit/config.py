@@ -65,6 +65,8 @@ STAR_SCORE = 25         # points for riding through one
 # ---------------------------------------------------------------- objects
 SLED_HW = 1.5           # half-widths, in world units
 BOOST_HW = 2.2
+AIM_SLOPE = 0.08        # full aim lifts (Down) or drops (Up) shots this many units per unit forward
+AIM_RATE = 4.0          # how fast the aim swings, in full ranges per second
 GUN_SPREAD = 1.2        # each twin gun sits this far left / right of the sled's middle
 BOOST_CHANCE = 0.375    # chance that a section gets a boost pad (one at most)
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb

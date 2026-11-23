@@ -178,13 +178,18 @@ class Renderer:
         """Screen point (x, y, scale) at depth z, or None behind the camera; see wall_xy
         for a / lat / h / rigid / flat."""
         game = self.game
+        if z - game.cam_z < NEAR:
+            return None
         if flat is None:
             flat = 1.0 if game.track.open[int(z // SEG)] else 0.0
-        d = z - game.cam_z
+        return self.proj_xy(z, *wall_xy(a, lat, h, rigid, flat))
+
+    def proj_xy(self, z, wx, wy):
+        """Screen point (x, y, scale) of cross-section point (wx, wy) at depth z, or None."""
+        d = z - self.game.cam_z
         if d < NEAR:
             return None
         ccx, ccy = self._centre(z)
-        wx, wy = wall_xy(a, lat, h, rigid, flat)
         px = ccx + wx - self.camx
         py = ccy + wy - self.camy
         k = self.f / d
@@ -318,7 +323,8 @@ class Renderer:
                 pygame.draw.circle(scr, mix((255, 255, 200), (255, 60, 0), t), p[:2],
                                    max(2, p[2] * (0.6 + 3.5 * t)), max(1, int(p[2] * 0.5 * (1 - t)) + 1))
         else:                                                 # bullet
-            p0, p1 = proj(z, o["a"], o["lat"], 1.0, True), proj(z + 11, o["a"], o["lat"], 1.0, True)
+            x, y, k = o["x"], o["y"], 11 / SEG                # trail runs along the bullet's own path
+            p0, p1 = self.proj_xy(z, x, y), self.proj_xy(z + 11, x + o["vx"] * k, y + o["vy"] * k)
             if p0 and p1:
                 w = max(4, int(p0[2] * 0.26))
                 pygame.draw.line(scr, (255, 220, 60), p0[:2], p1[:2], w)
