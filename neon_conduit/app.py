@@ -10,10 +10,10 @@ from .hud import Hud
 from .render import Renderer
 
 
-def read_controls(keys):
-    """Controls from the keyboard state (arrows or A / D / S, Space)."""
+def read_controls(keys, fire):
+    """Controls from the keyboard state (arrows or A / D / S); fire: Space was pressed this frame."""
     steer = (keys[pygame.K_RIGHT] or keys[pygame.K_d]) - (keys[pygame.K_LEFT] or keys[pygame.K_a])
-    return Controls(steer, keys[pygame.K_DOWN] or keys[pygame.K_s], keys[pygame.K_SPACE])
+    return Controls(steer, keys[pygame.K_DOWN] or keys[pygame.K_s], fire)
 
 
 class App:
@@ -43,12 +43,15 @@ class App:
         count = 0
         while True:
             dt = 1 / 60 if auto else min(0.05, self.clock.tick(60) / 1000.0)
+            fire = False                # one shot per Space press, holding it does not auto-fire
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
                     return
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_ESCAPE:
                         return
+                    if ev.key == pygame.K_SPACE:
+                        fire = True
                     if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and game.state != "play":
                         game.reset()
                         game.state = "play"
@@ -56,7 +59,7 @@ class App:
                     elif ev.key == pygame.K_p and game.state == "play":
                         self.paused = not self.paused
             if game.state == "play" and not self.paused:
-                game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed()))
+                game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed(), fire))
             self.draw()
             pygame.display.flip()
             count += 1
