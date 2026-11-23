@@ -89,11 +89,15 @@ class Renderer:
         far_z = (base + DRAW) * SEG
         for o in tr.objects:
             if o["z"] < far_z:
-                buckets.setdefault(int(o["z"] // SEG), []).append(o)
+                si = int(o["z"] // SEG)
+                if o.get("kind") == "boost":
+                    si = max(base, si)          # a pad half behind the camera: draw what is left
+                buckets.setdefault(si, []).append(o)
         for b in game.bullets:
             buckets.setdefault(int(b["z"] // SEG), []).append(b)
         for e in game.effects:
-            buckets.setdefault(int(e["z"] // SEG), []).append(e)
+            if "follow" not in e:                   # bursts riding on the sled are drawn with it
+                buckets.setdefault(int(e["z"] // SEG), []).append(e)
 
         for i in range(DRAW - 1, -1, -1):
             si = base + i
@@ -292,7 +296,10 @@ class Renderer:
         z = o["z"]
         if kind == "boost":
             a, hw = o["a"], BOOST_HW
-            q = [proj(z, a, -hw, 0.15), proj(z, a, hw, 0.15),
+            z0 = max(z, self.game.cam_z + NEAR + 0.05)          # cut off where it passes the camera
+            if z0 >= z + 10:
+                return
+            q = [proj(z0, a, -hw, 0.15), proj(z0, a, hw, 0.15),
                  proj(z + 10, a, hw, 0.15), proj(z + 10, a, -hw, 0.15)]
             if all(q):
                 pulse = 0.6 + 0.4 * math.sin(self.game.t * 12)
@@ -331,12 +338,14 @@ class Renderer:
                     pygame.draw.line(scr, col, (p[0] + 0.4 * r * math.cos(ang), p[1] + 0.4 * r * math.sin(ang)),
                                      (p[0] + r * math.cos(ang), p[1] + r * math.sin(ang)),
                                      max(1, int(p[2] * 0.25 * (1 - t)) + 1))
-        elif "age" in o:                                      # explosion
-            p = proj(z, o["a"], 0.0, 1.5, True)
+        elif "age" in o:                                      # explosion (or exhaust burst)
+            p = proj(z, o["a"], 0.0, o.get("h", 1.5), True)
             if p:
-                t = o["age"] / 0.45
-                pygame.draw.circle(scr, mix((255, 255, 200), (255, 60, 0), t), p[:2],
-                                   max(2, p[2] * (0.6 + 3.5 * t)), max(1, int(p[2] * 0.5 * (1 - t)) + 1))
+                t = o["age"] / o.get("life", 0.45)
+                c0, c1 = o.get("cols", ((255, 255, 200), (255, 60, 0)))
+                k = p[2] * o.get("size", 1.0)
+                pygame.draw.circle(scr, mix(c0, c1, t), p[:2],
+                                   max(2, k * (0.6 + 3.5 * t)), max(1, int(k * 0.5 * (1 - t)) + 1))
         else:                                                 # bullet
             x, y, k = o["x"], o["y"], 11 / SEG                # trail runs along the bullet's own path
             p0, p1 = self.proj_xy(z, x, y), self.proj_xy(z + 11, x + o["vx"] * k, y + o["vy"] * k)
@@ -353,9 +362,8 @@ class Renderer:
         exactly what they should, no more.
         """
         lo, hi = si * SEG, (si + 1) * SEG
-        taken = self.game.stars_taken
         for k in range(int((lo - STAR_REACH) // SEG), int((hi + STAR_REACH) // SEG) + 1):
-            if k < 0 or k in taken or not tr.has_star(k):
+            if k < 0 or not tr.has_star(k):
                 continue
             zk, a = k * SEG, tr.line(k)
             fl = 1.0 if tr.open[k] else 0.0
@@ -465,6 +473,10 @@ class Renderer:
                 col = mix(flame, (255, 255, 255), f_white)
                 for i in range(len(base)):
                     pygame.draw.polygon(scr, col, (base[i], base[i - 1], tail[:2]))
+
+        for e in game.effects:                                   # exhaust bursts, behind the hull
+            if "follow" in e:
+                self._object(e)
 
         faces = []
         for idx, mat in SHIP.faces:

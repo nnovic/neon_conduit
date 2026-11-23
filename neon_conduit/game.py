@@ -41,7 +41,7 @@ class Game:
         self.score = 0
         self.bullets = []
         self.effects = []
-        self.stars_taken = set()    # segments whose hint star the sled has ridden through
+        self.stars_taken = set()    # segments whose hint star has been scored (it stays on the track)
         self.cooldown = 0.0
         self.aim = 0.0          # gun elevation off the track slope, -1 (low) .. 1 (high)
         self.shake = 0.0
@@ -237,6 +237,10 @@ class Game:
                     if self.boost < BOOST_TIME - 0.6:       # not while still on the same pad
                         self.audio.play("boost")
                         self.score += 100
+                        # The exhaust bursts: an explosion ring that rides along on the nozzle.
+                        self.effects.append({"z": pz - 1.5, "a": self.theta, "age": 0.0,
+                                             "follow": -1.5, "drift": 4.0, "h": 0.55, "size": 1.5, "life": 0.22,
+                                             "cols": ((230, 255, 240), (40, 255, 130))})
                     self.boost = BOOST_TIME
             elif kind == "gate":
                 if self.prev_z < z <= pz:
@@ -263,10 +267,13 @@ class Game:
                 self.audio.play("star")
 
     def _effects(self, dt):
-        """Age explosions and sparks."""
+        """Age explosions and sparks; bursts that follow the sled stay on it."""
         for e in self.effects:
             e["age"] += dt
-        self.effects = [e for e in self.effects if e["age"] < 0.45]
+            if "follow" in e:                       # ...sliding back off the sled by drift
+                back = e.get("drift", 0.0) * e["age"] / e.get("life", 0.45)
+                e["z"], e["a"] = self.sled_z + e["follow"] - back, self.theta
+        self.effects = [e for e in self.effects if e["age"] < e.get("life", 0.45)]
         self.scrape_cd -= dt
         for p in self.sparks:
             p["age"] += dt
