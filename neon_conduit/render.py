@@ -116,6 +116,7 @@ class Renderer:
                 self._door(frames[i], si, max(0.0, i - frac) / DRAW)
 
         self._sled(game)
+        self._reticle(game)
         self._sparks(game)
         if game.flash > 0:
             veil = pygame.Surface((self.w, self.h))
@@ -507,6 +508,21 @@ class Renderer:
             pygame.draw.polygon(scr, (col[0] // 2, col[1] // 2, col[2] // 2), poly, 1)
         for idx, mat in SHIP.lines:                              # neon edges, on top of it all
             pygame.draw.lines(scr, MATERIALS.get(mat, DEFAULT)[0], False, [scr_pts[i][:2] for i in idx], 2)
+
+    def _reticle(self, game):
+        """Corner brackets round the drone the guns are locked on to."""
+        o = game.lock
+        p = o and self.proj(o["z"], o["a"], 0.0, 1.5, True)
+        if not p:
+            return
+        x, y = p[0], p[1]
+        s = max(10.0, p[2] * 2.4) * (1.0 + 0.08 * math.sin(game.t * 14))
+        k = s * 0.45                                             # bracket arm length
+        col = (255, 80, 160)
+        for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            cx, cy = x + dx * s, y + dy * s
+            pygame.draw.lines(self.screen, col, False,
+                              ((cx - dx * k, cy), (cx, cy), (cx, cy - dy * k)), 2)
 
     def _sparks(self, game):
         proj = self.proj

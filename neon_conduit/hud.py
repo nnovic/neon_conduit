@@ -66,7 +66,7 @@ class Hud:
             lines = ["Reach each gate before the clock runs out.",
                      "Follow the stars round the outside of bends, or you lose speed.",
                      "",
-                     "Left / Right  steer      Up / Down  aim      S  brake      Space  fire",
+                     "Left / Right  steer      Up / Down  aim      Space  fire",
                      "P  pause      Esc  quit",
                      "",
                      "Press ENTER to start"]

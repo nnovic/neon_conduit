@@ -68,6 +68,11 @@ BOOST_HW = 2.2
 AIM_SLOPE = 0.08        # full aim lifts (Down) or drops (Up) shots this many units per unit forward
 AIM_RATE = 4.0          # how fast the aim swings, in full ranges per second
 GUN_SPREAD = 1.2        # each twin gun sits this far left / right of the sled's middle
+BULLET_SPEED = 260.0    # shots fly this much faster than the sled was going when they left
+BULLET_LIFE = 0.9       # seconds before a shot fizzles out
+LOCK_RANGE = 60.0       # drones up to this far ahead can be locked on to (near ones only)
+LOCK_ANGLE = 0.14       # ...if a straight shot reaches them within this angle (radians, 8 deg)
+                        # of the sled's heading: the target must be roughly in front
 BOOST_CHANCE = 0.375    # chance that a section gets a boost pad (one at most)
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed

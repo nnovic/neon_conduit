@@ -9,14 +9,14 @@ from collections import namedtuple
 
 from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
-                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, GUN_SPREAD, LINE_FALLOFF, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
+                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
 
-# steer: -1 .. 1, brake / fire: bool, aim: -1 (lowered) .. 0 (along the slope) .. 1 (raised)
-Controls = namedtuple("Controls", "steer brake fire aim", defaults=(0,))
-IDLE = Controls(0, False, False)
+# steer: -1 .. 1, fire: bool, aim: -1 (lowered) .. 0 (along the slope) .. 1 (raised)
+Controls = namedtuple("Controls", "steer fire aim", defaults=(0,))
+IDLE = Controls(0, False)
 
 
 class Game:
@@ -44,6 +44,7 @@ class Game:
         self.stars_taken = set()    # segments whose hint star has been scored (it stays on the track)
         self.cooldown = 0.0
         self.aim = 0.0          # gun elevation off the track slope, -1 (low) .. 1 (high)
+        self.lock = None        # the drone the guns are locked on to, if any
         self.shake = 0.0
         self.flash = 0.0
         self.msg = ("", 0.0)
@@ -67,18 +68,19 @@ class Game:
     def autopilot(self):
         """Controls that steer for the fast line and keep firing (self-play and demos)."""
         aim = self.track.line(int(self.sled_z // SEG))
-        return Controls(max(-1, min(1, wrap(aim - self.theta) * 2 - self.omega)), False, True)
+        return Controls(max(-1, min(1, wrap(aim - self.theta) * 2 - self.omega)), True)
 
     # -------------------------------------------------------------- update
     def update(self, dt, controls):
         self.t += dt
         self.steer = controls.steer
 
-        self._move(dt, controls.brake)
+        self._move(dt)
         pz = self.sled_z
         seg = int(pz // SEG)
         self._steer(dt, controls.steer, pz, seg)
         self.aim += max(-AIM_RATE * dt, min(AIM_RATE * dt, controls.aim - self.aim))
+        self.lock = self._target(pz, dt)
         self._shoot(dt, controls.fire, pz)
         self._objects(dt, pz)
         self._hint_stars(pz)
@@ -94,14 +96,12 @@ class Game:
             self.best = max(self.best, self.score)
             self.state = "over"
 
-    def _move(self, dt, brake):
+    def _move(self, dt):
         """Speed up or slow down towards the target speed, then move along the track."""
         tr = self.track
         self.boost = max(0.0, self.boost - dt)
         target = self.max_speed * (BOOST_MULT if self.boost > 0 else 1.0)
         target *= 1.0 - LINE_SLOW * self.off_line
-        if brake:
-            target *= 0.35
         rate = 70.0 if self.speed < target else 55.0
         if self.speed < target:
             self.speed = min(target, self.speed + rate * dt)
@@ -164,18 +164,95 @@ class Game:
         self.cooldown -= dt
         if fire and self.cooldown <= 0:
             self.cooldown = 0.16
+            v = self.speed + BULLET_SPEED
             for side in (-GUN_SPREAD, GUN_SPREAD):              # twin guns, side by side
                 x, y = wall_xy(self.theta, side, 1.0, True, self.flat)
-                ux, uy = wall_xy(self.theta, side, 2.0, True, self.flat)   # one unit up from the sled
-                lift = self.aim * AIM_SLOPE * SEG                        # sideways drift per segment
+                aimed = self.lock and self._intercept(self.lock, x, y, pz + 3, v, dt)
+                if aimed:                                       # locked: straight at the drone
+                    vx, vy = aimed
+                else:                                           # free: along the slope, Up / Down aim
+                    ux, uy = wall_xy(self.theta, side, 2.0, True, self.flat)   # one unit up
+                    lift = self.aim * AIM_SLOPE * SEG                    # sideways drift per segment
+                    vx, vy = (ux - x) * lift, (uy - y) * lift
                 self.bullets.append({"z": pz + 3, "pz": pz + 3, "x": x, "y": y,
-                                     "vx": (ux - x) * lift, "vy": (uy - y) * lift, "life": 0.9})
+                                     "vx": vx, "vy": vy, "v": v, "life": BULLET_LIFE})
             self.audio.play("shot")
         for b in self.bullets:
             b["pz"] = b["z"]
-            self._fly(b, (self.speed + 260.0) * dt)
+            self._fly(b, b["v"] * dt)
             b["life"] -= dt
         self.bullets = [b for b in self.bullets if b["life"] > 0]
+
+    # ------------------------------------------------------------ lock-on
+    def _drone_later(self, o, wait, dt):
+        """Where drone o will be after wait seconds: depth and cross-section point.
+
+        Mirrors the drone's moves in _objects (forward at half top speed, swaying on its
+        sine). Shots and drones both move in the frame a shot is fired, but the drone's
+        sway reads the clock already advanced for that frame, hence the - dt.
+        """
+        z = o["z"] + 0.5 * self.max_speed * wait
+        a = o["a0"] + o["amp"] * math.sin((self.t + wait - dt) * o["w"] + o["ph"])
+        flat = self.track.open[int(z // SEG)]
+        if flat:
+            lim = floor_limit(1.0, self.track.hw_at(z))
+            a = max(-lim, min(lim, a))
+        return z, wall_xy(a, 0.0, 1.5, True, 1.0 if flat else 0.0)
+
+    def _drift(self, z0, z1):
+        """How far a straight shot fired with no drift from z0 moves off its start in the
+        cross-section frame by z1 (the track turning under it), as _fly would move it."""
+        tr = self.track
+        x = y = vx = vy = 0.0
+        z = z0
+        while z < z1:
+            s = int(z // SEG)
+            nxt = min(z1, (s + 1) * SEG)
+            x += vx * (nxt - z) / SEG
+            y += vy * (nxt - z) / SEG
+            z = nxt
+            if z >= (s + 1) * SEG:
+                vx -= tr.curv[s]
+                vy -= tr.pitch[s]
+        return x, y
+
+    def _intercept(self, o, x0, y0, z0, v, dt):
+        """Drift (vx, vy) for a straight shot from (x0, y0) at depth z0, speed v, that meets
+        drone o; None if that needs too wide an angle, hits a wall on the way or can't
+        catch it in time.
+
+        A shot's place at any depth is its start, plus its drift times the distance, plus
+        the track's turning (the same whatever the drift): solving for the drift is exact.
+        """
+        closing = v - 0.5 * self.max_speed
+        if closing <= 0:
+            return None
+        wait = (o["z"] - z0) / closing
+        if not 0 < wait < BULLET_LIFE - 0.05:
+            return None
+        z1, (tx, ty) = self._drone_later(o, wait, dt)
+        segs = (z1 - z0) / SEG
+        cx, cy = self._drift(z0, z1)
+        vx, vy = (tx - x0 - cx) / segs, (ty - y0 - cy) / segs
+        if math.hypot(vx, vy) / SEG > math.tan(LOCK_ANGLE):
+            return None
+        # A clear line of fire: the shot stays inside the tube all the way.
+        b = {"z": z0, "x": x0, "y": y0, "vx": vx, "vy": vy, "life": 1.0}
+        while b["z"] < z1 and b["life"] > 0:
+            self._fly(b, min(SEG, z1 - b["z"]))
+        return (vx, vy) if b["life"] > 0 else None
+
+    def _target(self, pz, dt):
+        """The drone to lock on to: the nearest one ahead in range that a straight shot from
+        the middle of the sled can reach, roughly in front and in plain sight."""
+        x, y = wall_xy(self.theta, 0.0, 1.0, True, self.flat)
+        v = self.speed + BULLET_SPEED
+        ahead = sorted((o for o in self.track.objects if o["kind"] == "drone"
+                        and pz + 3 < o["z"] < pz + LOCK_RANGE), key=lambda o: o["z"])
+        for o in ahead:
+            if self._intercept(o, x, y, pz + 3, v, dt):
+                return o
+        return None
 
     def _fly(self, b, dz):
         """Move a bullet dz along the track in a straight line, so it does not follow the bends.

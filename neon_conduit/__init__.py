@@ -8,7 +8,6 @@ if you reach the next gate.
 Controls
     Left / Right (or A / D)   steer around the tube wall
     Down / Up                 aim higher / lower (shots otherwise leave along the slope)
-    S                         brake
     Space                     fire
     P                         pause
     Enter                     start / restart
