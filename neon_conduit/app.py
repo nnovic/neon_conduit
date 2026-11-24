@@ -8,6 +8,7 @@ from .config import FOCAL, HORIZON, SCREEN
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
+from .title import TitleFlag
 
 
 def read_controls(keys, fire):
@@ -29,10 +30,16 @@ class App:
         self.game = Game(seed, Audio())
         self.renderer = Renderer(self.screen, focal, horizon)
         self.hud = Hud(self.screen)
+        self.title = TitleFlag(self.screen)
+        self.title_t = 0.0          # clock of the title screen's flag
         self.paused = False
 
     def draw(self):
         game = self.game
+        if game.state == "title":
+            self.title.draw(self.title_t)
+            self.hud.overlay(game)
+            return
         self.renderer.draw(game)
         self.hud.draw(game)
         if game.state != "play" or self.paused:
@@ -62,6 +69,7 @@ class App:
                         self.paused = False
                     elif ev.key == pygame.K_p and game.state == "play":
                         self.paused = not self.paused
+            self.title_t += dt
             if game.state == "play" and not self.paused:
                 game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed(), fire))
             self.draw()

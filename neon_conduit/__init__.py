@@ -25,6 +25,7 @@ Modules
     model       low-poly OBJ models (the racer: assets/ship.obj, built by tools/make_ship.py)
     hud         head-up display and title / game-over / pause screens
     speedo      the speedometer
+    title       the title screen's backdrop: a close-up of a checkered flag
     audio       synthesized sound effects
     app         window, main loop and command line
 """

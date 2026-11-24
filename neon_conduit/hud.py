@@ -1,4 +1,6 @@
 """Head-up display and the title, game-over and pause screens."""
+import math
+
 import pygame
 
 from .config import GATE_SEGS, SEG
@@ -15,6 +17,7 @@ class Hud:
         self.big = pygame.font.Font(None, 84)
         self.mid = pygame.font.Font(None, 44)
         self.speedo = Speedo()
+        self.band = None            # the title screen's darkened band behind its text
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -43,11 +46,21 @@ class Hud:
             self.text(self.mid, game.msg[0], (w // 2, 120), (255, 255, 160), center=True)
 
     def overlay(self, game):
-        """Darkened screen with the title, game-over or pause text, depending on game.state."""
-        veil = pygame.Surface((self.w, self.h))
-        veil.set_alpha(150)
-        self.screen.blit(veil, (0, 0))
+        """Darkened screen with the title, game-over or pause text, depending on game.state.
+
+        The title screen has its own backdrop (the flag): only a band behind the text is darkened.
+        """
         mid = self.w // 2
+        if game.state == "title":
+            if self.band is None:
+                self.band = pygame.Surface((self.w, 340), pygame.SRCALPHA)
+                for y in range(340):                          # dark in the middle, fading out
+                    self.band.fill((4, 6, 18, int(170 * math.sin(math.pi * y / 339))), (0, y, self.w, 1))
+            self.screen.blit(self.band, (0, 140))
+        else:
+            veil = pygame.Surface((self.w, self.h))
+            veil.set_alpha(150)
+            self.screen.blit(veil, (0, 0))
         if game.state == "title":
             self.text(self.big, "NEON CONDUIT", (mid, 190), (255, 80, 160), center=True)
             lines = ["Reach each gate before the clock runs out.",
