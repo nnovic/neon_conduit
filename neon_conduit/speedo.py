@@ -1,4 +1,6 @@
 """The speedometer: slanted segment digits, a rising bar of speed and a boost strip."""
+import math
+
 import pygame
 
 from .config import BOOST_MULT, BOOST_TIME, SPEED_CAP
@@ -20,6 +22,8 @@ BX0, BX1, BBOT = 108, 380, 64   # the speed bar's left / right ends and baseline
 
 RAMP = [(40, 220, 255), (150, 90, 255), (255, 60, 190), (255, 120, 40), (255, 40, 30)]
 FRAME = (255, 150, 40)
+BG = (8, 10, 24, 170)           # the panel's background
+BG_BOOST = (20, 95, 55, 215)    # ...while boosting
 
 
 def ramp(t):
@@ -71,7 +75,11 @@ class Speedo:
     def draw(self, screen, pos, game):
         s = self.surf
         s.fill((0, 0, 0, 0))
-        pygame.draw.polygon(s, (8, 10, 24, 170), self.frame)
+        bg = BG
+        if game.boost > 0:          # boosting: the panel glows the boost's green, gently pulsing
+            k = 0.75 + 0.25 * math.sin(game.t * 10)
+            bg = tuple(int(a + (b - a) * k) for a, b in zip(BG, BG_BOOST))
+        pygame.draw.polygon(s, bg, self.frame)
         pygame.draw.lines(s, FRAME, True, self.frame, 2)
 
         kmh = int(game.speed * KMH)
