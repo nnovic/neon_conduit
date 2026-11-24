@@ -4,7 +4,8 @@
 
 Left-click (or drag) paints a wall panel with the current brush, right-click paints
 it dark. Arrow keys shift the whole pattern: left / right round the tube, up / down
-along it. Ctrl+Z undoes, Ctrl+S saves, Space pauses the preview, Esc quits.
+along it. Rows read like the tunnel ahead: the top row is the furthest, the bottom
+row the closest. Ctrl+Z undoes, Ctrl+S saves, Space pauses the preview, Esc quits.
 """
 import os
 import sys
@@ -142,14 +143,16 @@ class Editor:
         self.set_rows(texts)
 
     def add_row(self):
+        """Add a row at the top: a copy of the first row, further ahead."""
         if len(self.cur.texts) < 64:
             self.change()
-            self.set_rows(self.cur.texts + [self.cur.texts[-1]])
+            self.set_rows([self.cur.texts[0]] + self.cur.texts)
 
     def remove_row(self):
+        """Remove the top row, the furthest ahead."""
         if len(self.cur.texts) > 1:
             self.change()
-            self.set_rows(self.cur.texts[:-1])
+            self.set_rows(self.cur.texts[1:])
 
     def ask(self, label, text, done, keep=None):
         """Prompt for a pattern name; keep: a name that may be reused (renaming to itself)."""
@@ -439,10 +442,11 @@ class Editor:
                                  (GRID.right + 4, GRID.y + k * CELL - 1), 2)
                 self.text("repeats", (GRID.right + 8, GRID.y + k * CELL - 8), ACCENT, font=self.small)
         pygame.draw.line(scr, LINE, (GRID.centerx - 1, GRID.y - 2), (GRID.centerx - 1, GRID.bottom), 1)
-        self.text("ahead", (GRID.right + 8, GRID.bottom - 34), DIM, font=self.small)
-        ax, ay = GRID.right + 24, GRID.bottom - 16
-        pygame.draw.line(scr, DIM, (ax, ay - 6), (ax, ay + 2), 2)
-        pygame.draw.polygon(scr, DIM, ((ax - 5, ay + 1), (ax + 5, ay + 1), (ax, ay + 8)))
+        # The top row is the furthest ahead: an arrow pointing up the grid, into the tunnel.
+        self.text("ahead", (GRID.right + 8, GRID.y + 18), DIM, font=self.small)
+        ax, ay = GRID.right + 24, GRID.y + 8
+        pygame.draw.line(scr, DIM, (ax, ay - 2), (ax, ay + 6), 2)
+        pygame.draw.polygon(scr, DIM, ((ax - 5, ay - 1), (ax + 5, ay - 1), (ax, ay - 8)))
 
         # live preview
         self.renderer.draw(self.game)

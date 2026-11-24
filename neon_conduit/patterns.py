@@ -26,9 +26,11 @@ class Pattern:
         self.set_rows(texts)
 
     def set_rows(self, texts):
-        """Set the rows from their text (strings of . # 0-9, WIDTH long)."""
+        """Set the rows from their text (strings of . # 0-9, WIDTH long), in file order:
+        the first row is the furthest ahead, the last the closest."""
         self.texts = list(texts)
-        self.rows = [[SHADES[c] for c in t] for t in self.texts]   # shades, 0 .. 1
+        # Shades (0 .. 1), nearest row first: rows[i] is i segments further ahead.
+        self.rows = [[SHADES[c] for c in t] for t in reversed(self.texts)]
 
     def shade(self, si, col, t):
         """Shade (0 = dark .. 1 = light) of wall panel col in segment si, at time t."""
