@@ -1,5 +1,6 @@
 """Head-up display and the title, game-over and pause screens."""
 import math
+import os
 
 import pygame
 
@@ -7,6 +8,13 @@ from .config import GATE_SEGS, SEG
 from .speedo import H as SPEEDO_H, W as SPEEDO_W, Speedo
 
 TEXT = (235, 240, 255)
+# The title's lettering: Russo One (SIL Open Font License, see assets/RussoOne-OFL.txt).
+TITLE_FONT = os.path.join(os.path.dirname(__file__), "assets", "RussoOne-Regular.ttf")
+TITLE_WIDTH = 0.86              # the title spans this much of the screen's width
+# Its fill, top to bottom: white-hot, pink, a hard step to deep pink, then orange.
+TITLE_STOPS = ((0.0, (255, 250, 255)), (0.42, (255, 120, 220)), (0.52, (255, 40, 150)), (1.0, (255, 170, 40)))
+TITLE_STROKE = (20, 0, 40)
+TITLE_GLOW = (255, 50, 170)
 BAND_Y = 110                    # the title screen's dark band leaves this much clear above and below
 BRIEF = ["Reach each gate before the clock runs out.",
          "Follow the stars round the outside of bends, or you lose speed.",
@@ -15,6 +23,48 @@ BRIEF = ["Reach each gate before the clock runs out.",
          "P  pause      F11  full screen      Esc  quit",
          "",
          "Press any key to go"]
+
+
+def neon_title(text, width):
+    """text set in the title font, width pixels wide: a gradient fill over a dark stroke,
+    in a wide glow. Returns the image and the margin left round the letters for the glow."""
+    size = 200
+    size = int(size * width / pygame.font.Font(TITLE_FONT, size).size(text)[0])
+    mask = pygame.font.Font(TITLE_FONT, size).render(text, True, (255, 255, 255))
+    mw, mh = mask.get_size()
+    pad = size // 2
+    w, h = mw + 2 * pad, mh + 2 * pad
+    out = pygame.Surface((w, h), pygame.SRCALPHA)
+    # Glow: the letters blurred wide, twice over.
+    halo = pygame.Surface((w, h), pygame.SRCALPHA)
+    tint = mask.copy()
+    tint.fill(TITLE_GLOW + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+    halo.blit(tint, (pad, pad))
+    for k in (4, 10):
+        blur = pygame.transform.smoothscale(pygame.transform.smoothscale(halo, (w // k, h // k)), (w, h))
+        out.blit(blur, (0, 0))
+        out.blit(blur, (0, 0))
+    # Dark stroke, a little heavier below, so the letters stand off the glow.
+    dark = mask.copy()
+    dark.fill(TITLE_STROKE + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+    r = max(3, size // 28)
+    step = max(1, r // 3)
+    for dx in range(-r, r + 1, step):
+        for dy in range(-r, r + 1, step):
+            if dx * dx + dy * dy <= r * r:
+                out.blit(dark, (pad + dx, pad + dy + r // 2))
+    # Fill.
+    grad = pygame.Surface((mw, mh), pygame.SRCALPHA)
+    for y in range(mh):
+        t = y / (mh - 1)
+        for (t0, c0), (t1, c1) in zip(TITLE_STOPS, TITLE_STOPS[1:]):
+            if t <= t1:
+                u = (t - t0) / (t1 - t0)
+                grad.fill(tuple(int(a + (b - a) * u) for a, b in zip(c0, c1)) + (255,), (0, y, mw, 1))
+                break
+    mask.blit(grad, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    out.blit(mask, (pad, pad))
+    return out, pad
 
 
 class Hud:
@@ -79,8 +129,10 @@ class Hud:
             self.title_layer = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
             screen, self.screen = self.screen, self.title_layer
             mid = self.w // 2
-            self.text(self.big, "NEON CONDUIT", (mid, 62), (255, 80, 160), center=True)
-            self.text(self.mid, "Press ENTER to start", (mid, self.h - 44), center=True)
+            title, pad = neon_title("NEON CONDUIT", int(self.w * TITLE_WIDTH))
+            self.screen.blit(title, title.get_rect(midtop=(mid, 18 - pad)))
+            prompt = pygame.font.Font(TITLE_FONT, 30)
+            self.text(prompt, "Press ENTER to start", (mid, self.h - 44), center=True)
             self.screen = screen
         self.title_layer.set_alpha(alpha)
         self.screen.blit(self.title_layer, (0, 0))
