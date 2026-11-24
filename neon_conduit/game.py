@@ -8,7 +8,7 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE,
+from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
                      DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
@@ -36,6 +36,7 @@ class Game:
         self.roll = 0.0         # camera position angle, follows theta
         self.speed = 0.0
         self.boost = 0.0
+        self.invincible = 0.0   # seconds left during which drones can't hurt the sled
         self.time_left = START_TIME
         self.level = 0
         self.score = 0
@@ -100,6 +101,7 @@ class Game:
         """Speed up or slow down towards the target speed, then move along the track."""
         tr = self.track
         self.boost = max(0.0, self.boost - dt)
+        self.invincible = max(0.0, self.invincible - dt)
         target = self.max_speed * (BOOST_MULT if self.boost > 0 else 1.0)
         target *= 1.0 - LINE_SLOW * self.off_line
         rate = 70.0 if self.speed < target else 55.0
@@ -307,7 +309,12 @@ class Game:
                         break
                 if alive and abs(z - pz) < 2.5 and lat_dist(o["a"], self.theta, flat) < 3.2:
                     alive = False
-                    self.crash(CRASH_KEEP)
+                    if self.invincible > 0:             # rammed out of the way: scores like a shot
+                        self.score += 500
+                        self.shake = max(self.shake, 0.15)
+                        self.audio.play("boom")
+                    else:
+                        self.crash(CRASH_KEEP)
                     self.effects.append({"z": z, "a": o["a"], "age": 0.0})
             elif kind == "boost":
                 if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
@@ -319,6 +326,7 @@ class Game:
                                              "follow": -1.5, "drift": 4.0, "h": 0.55, "size": 1.5, "life": 0.22,
                                              "cols": ((230, 255, 240), (40, 255, 130))})
                     self.boost = BOOST_TIME
+                    self.invincible = max(self.invincible, INVINCIBLE_TIME)
             elif kind == "gate":
                 if self.prev_z < z <= pz:
                     alive = False
@@ -383,6 +391,7 @@ class Game:
     def crash(self, keep_frac):
         self.speed *= keep_frac
         self.boost = 0.0
+        self.invincible = 0.0
         self.shake = 0.4
         self.flash = 0.25
         self.audio.play("hit")

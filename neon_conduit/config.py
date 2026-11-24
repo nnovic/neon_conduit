@@ -89,3 +89,4 @@ SPEED_CAP = 135.0       # cruising speed stops rising here
 BOOST_MULT = 1.65       # speed multiplier while boosting
 BOOST_TIME = 3.5        # seconds a boost pad keeps it going
 CRASH_KEEP = 0.2        # fraction of speed kept after hitting a drone
+INVINCIBLE_TIME = BOOST_TIME   # seconds a boost pad also makes the sled ram through drones unharmed

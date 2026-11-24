@@ -4,6 +4,7 @@ and its sparks.
 Everything is projected by hand with a simple pinhole camera and painted back to
 front, segment by segment, so nearer walls hide what lies behind them.
 """
+import colorsys
 import math
 import random
 
@@ -34,6 +35,18 @@ FLAME_BOOST = 2.2           # ...and the stretch is this much longer while boost
 FLAME_CLEAR = 4.5           # flame tips never come closer to the camera than this
 # Flame layers, drawn outermost first: (length, width, how far towards white).
 FLAME_LAYERS = ((1.15, 1.9, 0.0), (1.0, 1.0, 0.35), (0.55, 0.45, 0.85))
+# While invincible the hull shimmers: each face tinted along the rainbow, the hues rippling.
+SHIMMER_SPEED = 1.5         # turns of the rainbow per second
+SHIMMER_SPREAD = 0.27       # hue step from one face to the next
+SHIMMER_TINT = 0.6          # how far each face's colour goes towards its hue
+SHIMMER_ALPHA = 100         # hull opacity (0 .. 255)...
+SHIMMER_PULSE = 30          # ...give or take this much, pulsing
+SHIMMER_OUTLINE = 4         # width of the ship's outline, in pixels
+
+
+def rainbow(hue):
+    """Bright colour at hue (0 .. 1, wrapping round)."""
+    return tuple(int(255 * c) for c in colorsys.hsv_to_rgb(hue % 1.0, 0.65, 1.0))
 
 
 def star_fan(radius):
@@ -520,7 +533,16 @@ class Renderer:
             # (a small projection scale means far away).
             faces.append((mat == "glow", sum(p[2] for p in s) / len(s), idx, mat, s))
         faces.sort(key=lambda f: f[:2])
-        for _, _, idx, mat, s in faces:
+        # Invincible: the hull shimmers, a rainbow rippling across its faces, and turns a
+        # little see-through. It is painted on a layer of its own, then laid over the scene.
+        shield = game.invincible > 0
+        hull = scr
+        if shield:
+            xs = [p[0] for p in scr_pts]
+            ys = [p[1] for p in scr_pts]
+            x0, y0 = int(min(xs)) - 2, int(min(ys)) - 2
+            hull = pygame.Surface((int(max(xs)) - x0 + 4, int(max(ys)) - y0 + 4), pygame.SRCALPHA)
+        for k, (_, _, idx, mat, s) in enumerate(faces):
             col, lit = MATERIALS.get(mat, DEFAULT)
             if mat == "glow":
                 col = flame
@@ -534,10 +556,30 @@ class Renderer:
                 shade = 0.38 + 0.62 * max(0.0, d * SHIP_WINDING_N)
                 col = (int(col[0] * shade), int(col[1] * shade), int(col[2] * shade))
             poly = [p[:2] for p in s]
-            pygame.draw.polygon(scr, col, poly)
-            pygame.draw.polygon(scr, (col[0] // 2, col[1] // 2, col[2] // 2), poly, 1)
+            if shield:
+                hue = (game.t * SHIMMER_SPEED + k * SHIMMER_SPREAD) % 1.0
+                col = mix(col, rainbow(hue), SHIMMER_TINT)
+                poly = [(x - x0, y - y0) for x, y in poly]
+            pygame.draw.polygon(hull, col, poly)
+            pygame.draw.polygon(hull, (col[0] // 2, col[1] // 2, col[2] // 2), poly, 1)
+        if shield:
+            hull.set_alpha(int(SHIMMER_ALPHA + SHIMMER_PULSE * math.sin(game.t * 9)))
+            scr.blit(hull, (x0, y0))
+            neon = rainbow(game.t * SHIMMER_SPEED)              # edges cycle too, drawn bolder
+            # The outline: edges of the faces turned towards us that no other such face
+            # shares (the silhouette), opaque and bold, so the see-through ship still reads.
+            count = {}
+            for _, _, idx, mat, _ in faces:
+                if mat != "glow":
+                    for i, j in zip(idx, idx[1:] + idx[:1]):
+                        e = (min(i, j), max(i, j))
+                        count[e] = count.get(e, 0) + 1
+            for (i, j), c in count.items():
+                if c == 1:
+                    pygame.draw.line(scr, neon, scr_pts[i][:2], scr_pts[j][:2], SHIMMER_OUTLINE)
         for idx, mat in SHIP.lines:                              # neon edges, on top of it all
-            pygame.draw.lines(scr, MATERIALS.get(mat, DEFAULT)[0], False, [scr_pts[i][:2] for i in idx], 2)
+            col = neon if shield else MATERIALS.get(mat, DEFAULT)[0]
+            pygame.draw.lines(scr, col, False, [scr_pts[i][:2] for i in idx], 3 if shield else 2)
 
     def _reticle(self, game):
         """Corner brackets round the drone the guns are locked on to (developer mode)."""
