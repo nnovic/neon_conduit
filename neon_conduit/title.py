@@ -75,9 +75,9 @@ class TitleFlag:
 
 
 # The wireframe tunnel section.
-TUBE_SEGS = 3                   # its length, in track segments
-TUBE_DIST = 36.0                # camera distance to its centre
-TUBE_CENTRE = (0.5, 0.5)        # where its centre sits on screen, as fractions of the screen
+TUBE_SEGS = 9                   # its length, in track segments
+TUBE_DIST = 55.0                # camera distance to its centre
+TUBE_CENTRE = (0.5, 0.55)       # where its centre sits on screen, as fractions of the screen
 TUBE_SPIN = 0.3                 # how fast it turns round the upright, radians per second
 TUBE_TILT = 0.42                # how far the camera looks down on it, radians
 SHIP_SCALE = 2.0                # the racer, a little larger than life so it reads from afar
