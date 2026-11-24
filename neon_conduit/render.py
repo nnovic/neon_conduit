@@ -12,12 +12,13 @@ import pygame
 
 from . import config
 from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
-                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, OUTDOOR_THEMES, R, SEG, SIDES,
+                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES,
                      SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, SPEED_CAP, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
                        TUBE_XS, WALL_COLUMN, bank, clip, wall_xy, wrap)
 from . import decor
+from .themes import THEMES
 from .palette import DOOR_COL, DOOR_EDGE, FLOOR_COLS, FOG, GATE_GLOW, fogged, mix, tube_palette
 from .patterns import BY_NAME
 from .model import DEFAULT, MATERIALS, load_obj
@@ -75,7 +76,7 @@ class Renderer:
         star_rng = random.Random(7)
         self.stars = [(star_rng.uniform(-900, 900), star_rng.uniform(-900, 900),
                        star_rng.randint(90, 230)) for _ in range(220)]
-        self.panoramas = decor.panoramas(OUTDOOR_THEMES, focal / FOCAL)
+        self.panoramas = decor.panoramas(THEMES, focal / FOCAL)
 
     def draw(self, game):
         """Draw the world as seen from behind game's sled (no HUD)."""

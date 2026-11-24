@@ -38,11 +38,7 @@ OPEN_RUN = (2, 4)       # sections chained into one open run
 WIDE_CHANCE = 0.5       # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
 WIDE_TAPER = 20         # segments over which the kerbs splay out and back in
-# Each open run is either ground-level or in the air, and picks one backdrop
-# (assets/sky_<name>.jpg) from its kind's list. Ground-level backdrops show no space.
-GROUND_THEMES = ("metropolis", "dunes", "glacier")
-AIR_THEMES = ("orbit",)
-OUTDOOR_THEMES = GROUND_THEMES + AIR_THEMES
+THEMES_FILE = os.path.join(os.path.dirname(__file__), "outdoor_themes.txt")   # outdoor themes (themes.py)
 AIR_CHANCE = 0.25       # chance that an open run is in the air rather than ground-level
 
 # ------------------------------------------------------------------ doors

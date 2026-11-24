@@ -1,0 +1,51 @@
+; Neon Conduit - themes of the outdoor runs
+;
+; Each outdoor run is either ground-level (a flat road between kerbs) or in the air
+; (a see-through tube), and picks one theme at random from those of its kind.
+;
+;   [name]            starts a theme
+;   key = value       its settings:
+;                       kind    = ground, air, or both (ground air): the runs it can
+;                                 show on. Required.
+;                       image   = its backdrop, a file in assets/. Required. A 360-degree
+;                                 panorama: its width is one full turn. See
+;                                 tools/make_panoramas.py, which paints the sky_*.jpg.
+;                       horizon = the row of the horizon in the image, counted from the
+;                                 top; default 760
+;                       fog     = the colour the track fades into in the distance, like
+;                                 #d88a5a; default: averaged along the image's horizon
+;                       weight  = how often it is picked, against the other themes of
+;                                 its kind; default 1, and 0 leaves it out
+;                       kerbs   = the two colours of the kerbs, bright then dark, like
+;                                 #ffb040 #a0501c (ground-level runs only); default: a
+;                                 random pair for each run
+;
+; Each kind needs at least one theme. Ground-level backdrops show no space.
+;
+; A theme using every setting (only kind and image are required):
+;
+;   [sunset]                    ; a made-up example
+;   kind    = ground air        ; on both kinds of run
+;   image   = sky_sunset.jpg    ; assets/sky_sunset.jpg
+;   horizon = 700               ; the horizon is 700 pixels from the top of the image
+;   fog     = #d88a5a           ; a warm orange haze
+;   weight  = 0.5               ; picked half as often as a theme of weight 1
+;   kerbs   = #ffb040 #a0501c   ; amber and brown kerbs
+;
+; Everything after a ; is a comment.
+
+[metropolis]                ; towers and searchlights under a ringed moon
+kind  = ground
+image = sky_metropolis.jpg
+
+[dunes]                     ; desert dunes and arcologies, a low sun and a gas giant
+kind  = ground
+image = sky_dunes.jpg
+
+[glacier]                   ; snowy peaks, aurora, an orbital ring and a space elevator
+kind  = ground
+image = sky_glacier.jpg
+
+[orbit]                     ; the planet far below, the galaxy and a ring station
+kind  = air
+image = sky_orbit.jpg

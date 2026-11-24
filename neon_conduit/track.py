@@ -2,12 +2,13 @@
 import math
 import random
 
-from .config import (AIR_CHANCE, AIR_THEMES, BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
-                     LINE_MAX, GROUND_THEMES, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
+from .config import (AIR_CHANCE, BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
+                     LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
                      WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import kerb_cols
 from .patterns import PATTERNS
+from .themes import THEMES, of_kind
 
 
 class Track:
@@ -96,16 +97,17 @@ class Track:
         return "air" if self.air[i] else "ground"
 
     def outdoor_theme(self, i):
-        """Name of the backdrop of the outdoor run that segment i belongs to: one random theme
-        per run, from the themes of its kind (kept off the track's own rng)."""
-        themes = AIR_THEMES if self.outdoor_kind(i) == "air" else GROUND_THEMES
-        return random.Random(self.stretch[i] * 7349 + 5).choice(themes)
+        """Name of the theme of the outdoor run that segment i belongs to: one random theme
+        per run, from the themes of its kind, by their weights (kept off the track's own rng)."""
+        names, weights = of_kind(self.outdoor_kind(i))
+        return random.Random(self.stretch[i] * 7349 + 5).choices(names, weights)[0]
 
     def kerb_col(self, i, band):
-        """Kerb colour in open segment i: one random scheme per open run, striped by band."""
+        """Kerb colour in open segment i, striped by band: the run's theme's pair, or else
+        one random pair per open run."""
         run = self.stretch[i]
         if run not in self.kerb_cols:
-            self.kerb_cols[run] = kerb_cols(run)
+            self.kerb_cols[run] = THEMES[self.outdoor_theme(i)].kerbs or kerb_cols(run)
         return self.kerb_cols[run][band & 1]
 
     # --------------------------------------------------------- generation

@@ -21,6 +21,7 @@ Modules
     track       the endless, procedurally generated track
     game        game state and rules (no drawing, no keyboard)
     render      3D drawing of the world
+    themes      themes of the outdoor runs, read from outdoor_themes.txt
     decor       360-degree backdrops of the outdoor runs (images in assets/)
     model       low-poly OBJ models (the racer: assets/ship.obj, built by tools/make_ship.py)
     hud         head-up display and title / game-over / pause screens

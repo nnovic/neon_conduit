@@ -119,6 +119,8 @@ neon_conduit/
   track.py              the endless, procedurally generated track
   render.py             3D drawing of the world, projected by hand
   decor.py              the 360° backdrops of the outdoor runs
+  themes.py             themes of the outdoor runs, read from outdoor_themes.txt:
+                        backdrop, ground or air, horizon, fog, weight, kerb colours
   title.py              the title screen: flag and wireframe tunnel
   hud.py, speedo.py     head-up display and speedometer
   patterns.py           tunnel wall patterns, read from conduit_patterns.txt

@@ -1,25 +1,27 @@
 """Backdrops for the outdoor runs: 360-degree panoramas round the track.
 
-Each backdrop is an image in assets/ (sky_<name>.jpg, painted by
-tools/make_panoramas.py; any image laid out the same way will do). It is a
+Each backdrop is the image of a theme in outdoor_themes.txt (the sky_*.jpg there are
+painted by tools/make_panoramas.py; any image laid out the same way will do). It is a
 cylindrical panorama: its width is one full turn, so the view turns right round it as
-the track turns a full circle, and row HORIZON is the horizon. It lies "at infinity":
-it turns with the camera's roll and slides up and down as the track dips and climbs.
+the track turns a full circle, and the theme's horizon row is the horizon. It lies "at
+infinity": it turns with the camera's roll and slides up and down as the track dips and
+climbs.
 """
 import math
-import os
 
 import pygame
 
 from .config import SEG
-
-ASSETS = os.path.join(os.path.dirname(__file__), "assets")
-HORIZON = 760               # the horizon's row in the images (see tools/make_panoramas.py)
+from .themes import THEMES
 
 
 class Panorama:
     def __init__(self, name, scale=1.0):
-        img = pygame.image.load(os.path.join(ASSETS, f"sky_{name}.jpg"))
+        theme = THEMES[name]
+        img = pygame.image.load(theme.image)
+        if not 10 <= theme.horizon <= img.get_height() - 10:
+            raise ValueError("theme [%s]: horizon %d is outside its image, which is %d pixels high"
+                             % (name, theme.horizon, img.get_height()))
         if pygame.display.get_surface():
             img = img.convert()
         if scale != 1.0:
@@ -29,12 +31,13 @@ class Panorama:
         self.img = img
         self.half = pygame.transform.smoothscale(img, (img.get_width() // 2, img.get_height() // 2))
         self.w, self.h = img.get_size()
-        self.horizon = HORIZON * scale
+        self.horizon = theme.horizon * scale
         self.ppu = self.w / (2 * math.pi * SEG)     # pixels per unit of heading (see Game.heading)
         self.top = pygame.transform.average_color(img, (0, 0, self.w, 2))[:3]
         self.bottom = pygame.transform.average_color(img, (0, self.h - 2, self.w, 2))[:3]
         band = (0, int(self.horizon) - 10, self.w, 20)
-        self.fog = pygame.transform.average_color(img, band)[:3]   # haze the track fades into
+        # The haze the track fades into: the theme's, or the image's colour along the horizon.
+        self.fog = theme.fog or pygame.transform.average_color(img, band)[:3]
 
 
 _loaded = {}
