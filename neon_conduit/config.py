@@ -2,7 +2,7 @@
 import math
 import os
 
-DEVELOPER_MODE = False  # True draws the fast line through bends on the track
+DEVELOPER_MODE = False  # True draws the fast line through bends on the track, and the guns' lock-on
 
 # ----------------------------------------------------------------- screen
 SCREEN = (1024, 640)

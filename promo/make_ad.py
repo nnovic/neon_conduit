@@ -160,7 +160,6 @@ class Ad:
         self.app = app
         self.g = app.game
         self.renderer = app.renderer            # world only: the ad draws its own overlays
-        self.renderer._reticle = lambda game: None     # the guns' lock-on is still work in progress
         self.scr = app.screen
         self.speedo_surf = pygame.Surface((SPEEDO_W + 16, SPEEDO_H + 16), pygame.SRCALPHA)
         self.txt = Text()

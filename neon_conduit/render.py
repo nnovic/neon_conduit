@@ -121,7 +121,8 @@ class Renderer:
                 self._door(frames[i], si, max(0.0, i - frac) / DRAW)
 
         self._sled(game)
-        self._reticle(game)
+        if config.DEVELOPER_MODE:
+            self._reticle(game)
         self._sparks(game)
         if game.flash > 0:
             veil = pygame.Surface((self.w, self.h))
@@ -539,7 +540,7 @@ class Renderer:
             pygame.draw.lines(scr, MATERIALS.get(mat, DEFAULT)[0], False, [scr_pts[i][:2] for i in idx], 2)
 
     def _reticle(self, game):
-        """Corner brackets round the drone the guns are locked on to."""
+        """Corner brackets round the drone the guns are locked on to (developer mode)."""
         o = game.lock
         p = o and self.proj(o["z"], o["a"], 0.0, 1.5, True)
         if not p:
