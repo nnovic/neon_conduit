@@ -107,7 +107,7 @@ class Speedo:
                 pygame.draw.polygon(s, c + (int(255 * f),), poly)
 
         # Boost strip along the bottom, draining as the boost runs out.
-        b = game.boost / BOOST_TIME
+        b = min(1.0, game.boost / BOOST_TIME)                # full, never past the strip's end
         y0, y1 = H - 13, H - 8
         strip = lean([(DX, y0), (BX1, y0), (BX1, y1), (DX, y1)])
         pygame.draw.polygon(s, (20, 50, 35, 220), strip)
