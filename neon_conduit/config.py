@@ -21,6 +21,11 @@ FLOOR_HW = FLOOR_Y * math.tan(FLOOR_A)   # half-width of the flat floor
 FLAT_MAX = 1.4          # angles are clamped here when mapped onto an open section's flat floor
 PATTERNS_FILE = os.path.join(os.path.dirname(__file__), "conduit_patterns.txt")   # tunnel wall patterns
 
+# ------------------------------------------------------------------ music
+TITLE_MUSIC = os.path.join(os.path.dirname(__file__), "assets", "Hero_Immortal.mp3")   # see CREDITS.md
+TITLE_MUSIC_VOLUME = 0.6
+TITLE_MUSIC_FADE = 1.0  # seconds the title music takes to fade in
+
 # ----------------------------------------------------------------- camera
 PLAYER_D = 12.0         # how far ahead of the camera the sled sits
 CAM_H = 3.5             # camera height above the surface the sled is riding on

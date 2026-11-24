@@ -1,4 +1,4 @@
-"""Sound effects, synthesized at start-up: no sound files needed."""
+"""Sound effects, synthesized at start-up, and the music, streamed from assets/."""
 import math
 import random
 from array import array
@@ -53,9 +53,32 @@ class Audio:
         if self.ok:
             self.sounds[name].play()
 
+    def music(self, path, volume=1.0, fade=0.0):
+        """Loop the music file at path, fading in over fade seconds. A file that can't be
+        played is skipped: the game goes on without it."""
+        if not self.ok:
+            return
+        try:
+            pygame.mixer.music.load(path)
+            pygame.mixer.music.set_volume(volume)
+            pygame.mixer.music.play(loops=-1, fade_ms=int(fade * 1000))
+        except (pygame.error, OSError) as e:
+            print("No music (%s): %s" % (path, e))
+
+    def stop_music(self, fade=0.0):
+        """Fade the music out over fade seconds, or stop it at once."""
+        if self.ok:
+            pygame.mixer.music.fadeout(int(fade * 1000))
+
 
 class Silent:
     """Stands in for Audio where no sound is wanted (tests, headless rendering)."""
 
     def play(self, name):
+        pass
+
+    def music(self, path, volume=1.0, fade=0.0):
+        pass
+
+    def stop_music(self, fade=0.0):
         pass

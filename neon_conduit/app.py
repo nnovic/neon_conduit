@@ -4,7 +4,7 @@ import argparse
 import pygame
 
 from .audio import Audio
-from .config import FOCAL, HORIZON, SCREEN
+from .config import FOCAL, HORIZON, SCREEN, TITLE_MUSIC, TITLE_MUSIC_FADE, TITLE_MUSIC_VOLUME
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
@@ -34,7 +34,8 @@ class App:
         self.screen = pygame.display.set_mode(size, flags)
         pygame.mouse.set_visible(not fullscreen)
         self.clock = pygame.time.Clock()
-        self.game = Game(seed, Audio())
+        self.audio = Audio()
+        self.game = Game(seed, self.audio)
         self.renderer = Renderer(self.screen, focal, horizon)
         self.hud = Hud(self.screen)
         self.title = TitleFlag(self.screen)
@@ -98,6 +99,8 @@ class App:
         auto = frames is not None
         if auto:
             game.state = "play"
+        else:
+            self.audio.music(TITLE_MUSIC, TITLE_MUSIC_VOLUME, TITLE_MUSIC_FADE)
         count = 0
         while True:
             dt = 1 / 60 if auto else min(0.05, self.clock.tick(60) / 1000.0)
@@ -123,6 +126,7 @@ class App:
                             game.reset()
                             self.launch_t = 0.0
                             self.title_tunnel.depart(self.title_t)
+                            self.audio.stop_music(LAUNCH_MOVE + LAUNCH_FADE)   # gone by the start line
                         else:
                             self.start()
                     elif ev.key == pygame.K_p and game.state == "play":

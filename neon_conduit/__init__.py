@@ -27,7 +27,7 @@ Modules
     hud         head-up display and title / game-over / pause screens
     speedo      the speedometer
     title       the title screen's backdrop: a close-up of a checkered flag
-    audio       synthesized sound effects
+    audio       synthesized sound effects, and the music (assets/, see CREDITS.md)
     app         window, main loop and command line
 """
 from .game import Controls, Game
