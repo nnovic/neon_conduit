@@ -12,7 +12,7 @@ BRIEF = ["Reach each gate before the clock runs out.",
          "Follow the stars round the outside of bends, or you lose speed.",
          "",
          "Left / Right  steer      Up / Down  aim      Space  fire",
-         "P  pause      Esc  quit",
+         "P  pause      F11  full screen      Esc  quit",
          "",
          "Press any key to go"]
 

@@ -25,10 +25,14 @@ def read_controls(keys, fire):
 
 
 class App:
-    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON):
+    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False):
         pygame.init()
         pygame.display.set_caption("Neon Conduit")
-        self.screen = pygame.display.set_mode(size)
+        # SCALED: the game always draws at size; pygame blows it up to fill the screen in
+        # full screen (keeping its shape, with black bars if need be).
+        flags = pygame.SCALED | (pygame.FULLSCREEN if fullscreen else 0)
+        self.screen = pygame.display.set_mode(size, flags)
+        pygame.mouse.set_visible(not fullscreen)
         self.clock = pygame.time.Clock()
         self.game = Game(seed, Audio())
         self.renderer = Renderer(self.screen, focal, horizon)
@@ -84,6 +88,10 @@ class App:
             title.set_alpha(int(255 * (1 - ease((s - LAUNCH_MOVE) / LAUNCH_FADE))))
             scr.blit(title, (0, 0))
 
+    def toggle_fullscreen(self):
+        pygame.display.toggle_fullscreen()
+        pygame.mouse.set_visible(not pygame.display.is_fullscreen())
+
     def run(self, frames=None, screenshot=None):
         """Play until the window closes; with frames, self-play that many frames and stop."""
         game = self.game
@@ -100,6 +108,9 @@ class App:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_ESCAPE:
                         return
+                    if ev.key == pygame.K_F11:
+                        self.toggle_fullscreen()
+                        continue
                     if self.launch_t is not None:         # nothing to do while it plays
                         continue
                     if game.state == "brief":            # any key sets the racer off...
@@ -139,8 +150,9 @@ def main():
     ap.add_argument("--seed", type=int, help="fixed track seed")
     ap.add_argument("--frames", type=int, help="self-play this many frames, then exit (for testing)")
     ap.add_argument("--screenshot", help="with --frames, save the last frame to this file")
+    ap.add_argument("--fullscreen", action="store_true", help="start in full screen (F11 toggles it)")
     args = ap.parse_args()
-    app = App(args.seed)
+    app = App(args.seed, fullscreen=args.fullscreen)
     try:
         app.run(args.frames, args.screenshot)
     finally:

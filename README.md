@@ -53,6 +53,7 @@ python3 play.py
 | Option | What it does |
 |---|---|
 | `--seed N` | Race a fixed track: the same seed always gives the same course |
+| `--fullscreen` | Start in full screen (F11 switches back and forth) |
 | `--frames N` | Let the auto-pilot play N frames, then quit (for testing) |
 | `--screenshot FILE` | With `--frames`, save the last frame as an image |
 
@@ -64,6 +65,7 @@ python3 play.py
 | ↓ / ↑ | Aim higher / lower |
 | Space | Fire (one shot per press) |
 | P | Pause |
+| F11 | Full screen on / off |
 | Enter | Start / race again |
 | Esc | Quit |
 

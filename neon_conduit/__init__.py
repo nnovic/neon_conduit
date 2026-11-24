@@ -10,6 +10,7 @@ Controls
     Down / Up                 aim higher / lower (shots otherwise leave along the slope)
     Space                     fire
     P                         pause
+    F11                       full screen on / off
     Enter                     start / restart
     Esc                       quit
 
