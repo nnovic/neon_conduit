@@ -1,4 +1,5 @@
-"""3D drawing of the world: tube and open sections, doors, objects, the sled and its sparks.
+"""3D drawing of the world: tube, open and in-the-air sections, doors, objects, the sled
+and its sparks.
 
 Everything is projected by hand with a simple pinhole camera and painted back to
 front, segment by segment, so nearer walls hide what lies behind them.
@@ -45,6 +46,8 @@ def star_fan(radius):
         pts.append((STAR_STRETCH * rr * math.cos(ang), rr * math.sin(ang)))
     return [((0.0, 0.0), pts[j], pts[(j + 1) % 10]) for j in range(10)]
 
+
+FLOOR_EDGES = set(FLOOR_SIDES) | {s + 1 for s in FLOOR_SIDES}    # vertices on the floor
 
 STAR_GLOW = star_fan(STAR_R * 1.4)
 STAR_CORE = star_fan(STAR_R)
@@ -105,6 +108,8 @@ class Renderer:
                 fog = min(1.0, (max(0.0, i - frac) / DRAW) ** 1.3 * 1.15)
                 if tr.open[si]:
                     self._open_segment(tr, si, orings[i], orings[i + 1], fog)
+                elif tr.air[si]:
+                    self._air_segment(tr, si, rings[i], rings[i + 1], fog)
                 else:
                     self._tube_segment(tr, si, rings[i], rings[i + 1], fog)
                 if config.DEVELOPER_MODE and tr.bend(si) > 0.25:
@@ -146,12 +151,12 @@ class Renderer:
     def _outdoors(self, tr, base):
         """The backdrop to show, and the colour of the fog.
 
-        An open run's backdrop shows while the run is in view; its haze takes over the fog
+        An outdoor run's backdrop shows while the run is in view; its haze takes over the fog
         gradually as the run comes closer, and gives way again after it's left behind.
         """
         fade_in, fade_out = 30, 12                  # segments
-        ahead = next((i for i in range(DRAW) if tr.open[base + i]), None)
-        behind = next((j for j in range(1, fade_out + 1) if base >= j and tr.open[base - j]), None)
+        ahead = next((i for i in range(DRAW) if tr.outdoor(base + i)), None)
+        behind = next((j for j in range(1, fade_out + 1) if base >= j and tr.outdoor(base - j)), None)
         theme, haze, amount = None, FOG, 0.0
         if ahead is not None:
             theme = self.panoramas[tr.outdoor_theme(base + ahead)]
@@ -277,6 +282,30 @@ class Renderer:
             col = fogged(c, lt, fog, self.fog_col)
             for v, t in quads:
                 pygame.draw.polygon(self.screen, col, (r0[v], r0[t], r1[t], r1[v]))
+
+    def _air_segment(self, tr, si, r0, r1, fog):
+        """A see-through stretch of tube, up in the air: only its edges, as glowing lines,
+        so the backdrop shows through. Lines along every edge, a ring every other segment;
+        the floor's edges are brighter, to read which way is down."""
+        if fog >= 1.0:
+            return
+        scr = self.screen
+        pal = tube_palette(tr.stretch[si])
+        wall = mix(pal[1], (255, 255, 255), 0.3)
+        floor = mix(pal[1], (255, 255, 255), 0.75)
+        near = (1.0 - fog) ** 2
+        wide = 1 + int(2.5 * near)                  # thicker close up
+        halo = wide + 2
+        fc = self.fog_col
+        gate = si % GATE_SEGS in (0, GATE_SEGS - 1)
+        edges = [(r0[s], r1[s], floor if s in FLOOR_EDGES else wall) for s in range(SIDES)]
+        if gate or si % 2 == 0:
+            ring = GATE_GLOW if gate else wall
+            edges += [(r0[s], r0[s + 1], ring) for s in range(SIDES)]
+        for p0, p1, c in edges:
+            core = fogged(c, 1.0, fog, fc)
+            pygame.draw.line(scr, mix(fc, core, 0.4), p0, p1, halo)       # a soft glow...
+            pygame.draw.line(scr, core, p0, p1, wide)                     # ...and the line
 
     def _fast_line(self, tr, si, fog):
         """The fast line (developer mode): cyan while the sled is on it, amber when it has strayed."""

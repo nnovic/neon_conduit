@@ -2,8 +2,8 @@
 import math
 import random
 
-from .config import (BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
-                     LINE_MAX, OPEN_CHANCE, OUTDOOR_THEMES, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
+from .config import (AIR_CHANCE, AIR_THEMES, BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
+                     LINE_MAX, GROUND_THEMES, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
                      WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import kerb_cols
@@ -22,9 +22,10 @@ class Track:
         self.rng = rng
         self.curv = []
         self.pitch = []
-        self.open = []
+        self.open = []             # outdoors, ground-level: a flat road between kerbs
+        self.air = []              # outdoors, in the air: a see-through tube
         self.width = []            # floor half-width at the start of each segment
-        self.stretch = []          # per segment: how many open runs come before it
+        self.stretch = []          # per segment: how many outdoor runs come before it
         self.objects = []          # dicts: kind, z, a, ...
         self.door_angles = {}
         self.kerb_cols = {}
@@ -37,8 +38,8 @@ class Track:
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""
         while len(self.curv) < seg_index:
-            # Never two open runs back to back: there is always tube in between.
-            if not self.open[-1] and self.rng.random() < OPEN_CHANCE:
+            # Never two outdoor runs back to back: there is always tube in between.
+            if not self.outdoor(-1) and self.rng.random() < OPEN_CHANCE:
                 self._open_run(level)
             else:
                 self._section(*self._shape(level), False, level)
@@ -68,9 +69,13 @@ class Track:
         i = int(f)
         return self.width[i] + (self.width[i + 1] - self.width[i]) * (f - i)
 
+    def outdoor(self, i):
+        """True where segment i is outdoors: a ground-level road or an in-the-air tube."""
+        return self.open[i] or self.air[i]
+
     def is_door(self, i):
-        """True where segment i is tube following an open section: a door closes it off."""
-        return 0 < i < len(self.open) and self.open[i - 1] and not self.open[i]
+        """True where segment i is tube following an outdoor section: a door closes it off."""
+        return 0 < i < len(self.open) and self.outdoor(i - 1) and not self.outdoor(i)
 
     def door_angle(self, i):
         """Tilt of door i's split line: vertical, horizontal or either diagonal, picked at
@@ -86,10 +91,15 @@ class Track:
             self.tube_styles[run] = random.Random(run * 104729 + 7).choice(PATTERNS).name
         return self.tube_styles[run]
 
+    def outdoor_kind(self, i):
+        """Kind of outdoor segment i: "ground" (a flat road) or "air" (a see-through tube)."""
+        return "air" if self.air[i] else "ground"
+
     def outdoor_theme(self, i):
-        """Name of the backdrop of the open run that segment i belongs to: one random theme
-        per run (kept off the track's own rng)."""
-        return random.Random(self.stretch[i] * 7349 + 3).choice(OUTDOOR_THEMES)
+        """Name of the backdrop of the outdoor run that segment i belongs to: one random theme
+        per run, from the themes of its kind (kept off the track's own rng)."""
+        themes = AIR_THEMES if self.outdoor_kind(i) == "air" else GROUND_THEMES
+        return random.Random(self.stretch[i] * 7349 + 5).choice(themes)
 
     def kerb_col(self, i, band):
         """Kerb colour in open segment i: one random scheme per open run, striped by band."""
@@ -111,9 +121,12 @@ class Track:
         return n, c, p
 
     def _open_run(self, level):
-        """Several open sections back to back; some runs splay out to a wider floor."""
+        """Several outdoor sections back to back. Ground-level runs are a flat road, and
+        some splay out to a wider floor; runs in the air are a see-through tube."""
         rng = self.rng
         self.runs += 1
+        # Ground or air: picked off the track's own rng, so the course is the same either way.
+        air = random.Random(self.runs * 7349 + 3).random() < AIR_CHANCE
         shapes = [self._shape(level) for _ in range(rng.randint(*OPEN_RUN))]
         total = sum(n for n, _, _ in shapes)
         peak = rng.uniform(*WIDE_HW) if rng.random() < WIDE_CHANCE else FLOOR_HW
@@ -124,10 +137,13 @@ class Track:
             widths.append(FLOOR_HW + (peak - FLOOR_HW) * t * t * (3 - 2 * t))
         j = 0
         for n, c, p in shapes:
-            self._section(n, c, p, True, level, widths=widths[j:j + n])
+            if air:
+                self._section(n, c, p, False, level, air=True)
+            else:
+                self._section(n, c, p, True, level, widths=widths[j:j + n])
             j += n
 
-    def _section(self, n, c, p, is_open, level, empty=False, widths=None):
+    def _section(self, n, c, p, is_open, level, empty=False, widths=None, air=False):
         """n segments easing into and out of curvature c and pitch p, with boosts and drones."""
         rng = self.rng
         start = len(self.curv)
@@ -136,6 +152,7 @@ class Track:
             self.curv.append(c * env)
             self.pitch.append(p * env)
             self.open.append(is_open)
+            self.air.append(air)
             self.stretch.append(self.runs)
             self.width.append(widths[j] if widths else FLOOR_HW)
         # Checkpoint gates at fixed intervals.
