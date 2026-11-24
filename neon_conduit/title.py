@@ -9,9 +9,10 @@ import math
 
 import pygame
 
-from .config import FLOOR_Y, SEG, SIDES
+from .config import CAM_H, FLOOR_Y, NEAR, PLAYER_D, SEG, SIDES
 from .geometry import SIDE_A, SIDE_R
 from .model import load_obj
+from .render import SHIP_HOVER as GAME_HOVER
 from .palette import mix, tube_palette
 from .patterns import BY_NAME, WIDTH
 
@@ -104,15 +105,28 @@ def _edges(model):
     return out
 
 
+def ease(u):
+    """0 to 1, starting and ending gently."""
+    u = max(0.0, min(1.0, u))
+    return u * u * (3 - 2 * u)
+
+
 class TitleTunnel:
     """A few segments of the tube, flat floor and all, with the racer on its floor, as
-    glowing lines turning round the upright; nearer lines brighter."""
+    glowing lines turning round the upright; nearer lines brighter.
 
-    def __init__(self, screen):
+    When the race is launched it glides into the game's own view: the camera behind the
+    racer, the section filling the first rings of the (straight) start of the track, and
+    the racer at its true size, every line on the game's.
+    """
+
+    def __init__(self, screen, game_view):
         self.screen = screen
         w, h = screen.get_size()
         self.f = w * 0.62
         self.cx, self.cy = w * TUBE_CENTRE[0], h * TUBE_CENTRE[1]
+        self.game_view = game_view          # the game's focal length and screen centre
+        self.yaw0 = None                    # the turn it had when the launch began
         # Tube: wall corners round each ring, x right, y up, z along; centred on the origin.
         half = TUBE_SEGS * SEG / 2
         verts, edges = [], []
@@ -127,37 +141,62 @@ class TitleTunnel:
                 if k < TUBE_SEGS:
                     edges.append((k * SIDES + v, (k + 1) * SIDES + v, RAIL_COL))
         edges = [e + (1,) for e in edges]
-        # Racer: on the floor, centred along the section.
+        # Racer: on the floor. On the title, larger than life and centred along the section;
+        # in the game's view, true to size and as far ahead of the camera as the game has it.
         ship = load_obj("ship.obj")
         zs = [p[2] for p in ship.verts]
         zmid = (min(zs) + max(zs)) / 2
         base = len(verts)
-        for x, y, z in ship.verts:
-            verts.append((x * SHIP_SCALE, -FLOOR_Y + SHIP_HOVER + y * SHIP_SCALE, (z - zmid) * SHIP_SCALE))
+        self.ship_title = [(x * SHIP_SCALE, -FLOOR_Y + SHIP_HOVER + y * SHIP_SCALE, (z - zmid) * SHIP_SCALE)
+                           for x, y, z in ship.verts]
+        self.ship_game = [(x, -FLOOR_Y + GAME_HOVER + y, PLAYER_D + z - half) for x, y, z in ship.verts]
+        verts += self.ship_title
         for i, j, mat in _edges(ship):
             edges.append((base + i, base + j, SHIP_COLS.get(mat, SHIP_COL), 2))   # bolder
-        self.verts, self.edges = verts, edges
+        self.tube, self.edges = verts[:base], edges
         self.reach = max(math.sqrt(x * x + y * y + z * z) for x, y, z in verts)
+        # In the game's view the camera sits CAM_H over the floor, the section's near end
+        # at its feet: the section's centre is half its length ahead.
+        self.game_shift = (FLOOR_Y - CAM_H, half)
 
-    def draw(self, t):
-        yaw = TUBE_SPIN * t
-        pitch = TUBE_TILT + 0.06 * math.sin(t * 0.4)
+    def depart(self, t):
+        """The launch begins now, at title clock t."""
+        self.yaw0 = TUBE_SPIN * t
+
+    def draw(self, t, u=0.0):
+        """Draw at title clock t, u of the way (0 to 1) from the title's view to the game's."""
+        yaw = TUBE_SPIN * t if self.yaw0 is None else self.yaw0
+        if u > 0.0:     # straighten up the shorter way round, to face down the track
+            yaw += (round(yaw / (2 * math.pi)) * 2 * math.pi - yaw) * u
+        pitch = (TUBE_TILT + 0.06 * math.sin(t * 0.4)) * (1 - u)
+        bob = 0.4 * math.sin(t * 0.9) * (1 - u)
+        gf, gcx, gcy = self.game_view
+        f, cx, cy = self.f + (gf - self.f) * u, self.cx + (gcx - self.cx) * u, self.cy + (gcy - self.cy) * u
+        ty, tz = self.game_shift[0] * u + bob, TUBE_DIST + (self.game_shift[1] - TUBE_DIST) * u
         cyw, syw = math.cos(yaw), math.sin(yaw)
         cp, sp = math.cos(pitch), math.sin(pitch)
-        bob = 0.4 * math.sin(t * 0.9)
-        f, cx, cy = self.f, self.cx, self.cy
+        ship = [(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u)
+                for a, b in zip(self.ship_title, self.ship_game)]
         pts = []
-        for x, y, z in self.verts:
+        for x, y, z in self.tube + ship:
             x, z = x * cyw + z * syw, -x * syw + z * cyw          # turn round the upright
-            y += bob
             y, z = y * cp - z * sp, y * sp + z * cp                # tip towards the camera
-            d = TUBE_DIST + z
-            pts.append((cx + f * x / d, cy - f * y / d, d))
-        near, span = TUBE_DIST - self.reach, 2 * self.reach
+            pts.append((x, y + ty, z + tz))
+        near, span = tz - self.reach, 2 * self.reach
         lines = []
         for i, j, col, wide in self.edges:
             (x0, y0, d0), (x1, y1, d1) = pts[i], pts[j]
-            lines.append(((d0 + d1) / 2, (x0, y0), (x1, y1), col, wide))
+            if d0 < NEAR and d1 < NEAR:
+                continue
+            if d0 < NEAR or d1 < NEAR:                            # cut off at the near plane, as the game does
+                k = (NEAR - d0) / (d1 - d0)
+                xn, yn = x0 + (x1 - x0) * k, y0 + (y1 - y0) * k
+                if d0 < NEAR:
+                    x0, y0, d0 = xn, yn, NEAR
+                else:
+                    x1, y1, d1 = xn, yn, NEAR
+            lines.append(((d0 + d1) / 2, (cx + f * x0 / d0, cy - f * y0 / d0),
+                          (cx + f * x1 / d1, cy - f * y1 / d1), col, wide))
         lines.sort(key=lambda l: -l[0])                           # far first: near lines on top
         scr = self.screen
         for d, p0, p1, col, wide in lines:

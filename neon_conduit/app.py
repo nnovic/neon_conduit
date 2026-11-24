@@ -8,7 +8,10 @@ from .config import FOCAL, HORIZON, SCREEN
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
-from .title import TitleFlag, TitleTunnel
+from .title import TitleFlag, TitleTunnel, ease
+
+LAUNCH_MOVE = 1.6               # seconds the title's tunnel takes to glide into the game's view...
+LAUNCH_FADE = 0.8               # ...and the title then takes to fade into the game
 
 
 def read_controls(keys, fire):
@@ -31,8 +34,10 @@ class App:
         self.renderer = Renderer(self.screen, focal, horizon)
         self.hud = Hud(self.screen)
         self.title = TitleFlag(self.screen)
-        self.title_tunnel = TitleTunnel(self.screen)
+        r = self.renderer
+        self.title_tunnel = TitleTunnel(self.screen, (r.focal, r.cx, r.cy))
         self.title_t = 0.0          # clock of the title screen's flag and tunnel
+        self.launch_t = None        # time since ENTER on the title, while it turns into the game
         self.paused = False
 
     def start(self, reset=True):
@@ -44,6 +49,9 @@ class App:
 
     def draw(self):
         game = self.game
+        if self.launch_t is not None:
+            self.draw_launch()
+            return
         if game.state == "title":
             self.title.draw(self.title_t)
             # The tunnel goes over the darkened middle, so it stands out, but under the text.
@@ -56,6 +64,25 @@ class App:
             return
         if game.state != "play" or self.paused:
             self.hud.overlay(game)
+
+    def draw_launch(self):
+        """From the title into the game: the flag darkens and the text fades while the
+        tunnel glides into the game's view; then the game fades in under it."""
+        s, scr = self.launch_t, self.screen
+        u = ease(s / LAUNCH_MOVE)
+        self.title.draw(self.title_t)
+        self.hud.title_band()
+        veil = pygame.Surface(scr.get_size())
+        veil.set_alpha(int(235 * u))
+        scr.blit(veil, (0, 0))
+        self.title_tunnel.draw(self.title_t, u)
+        self.hud.title_text(int(255 * (1 - u)))
+        if s > LAUNCH_MOVE:
+            title = scr.copy()
+            self.renderer.draw(self.game)
+            self.hud.draw(self.game)
+            title.set_alpha(int(255 * (1 - ease((s - LAUNCH_MOVE) / LAUNCH_FADE))))
+            scr.blit(title, (0, 0))
 
     def run(self, frames=None, screenshot=None):
         """Play until the window closes; with frames, self-play that many frames and stop."""
@@ -73,20 +100,29 @@ class App:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_ESCAPE:
                         return
+                    if self.launch_t is not None:         # nothing to do while it plays
+                        continue
                     if game.state == "brief":            # any key sets the racer off...
                         self.start(False)
                         continue                           # ...and does nothing else
                     if ev.key == pygame.K_SPACE:
                         fire = True
                     if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and game.state != "play":
-                        if game.state == "title":         # to the start line, briefing up
+                        if game.state == "title":         # off to the start line
                             game.reset()
-                            game.state = "brief"
+                            self.launch_t = 0.0
+                            self.title_tunnel.depart(self.title_t)
                         else:
                             self.start()
                     elif ev.key == pygame.K_p and game.state == "play":
                         self.paused = not self.paused
             self.title_t += dt
+            if self.launch_t is not None:
+                self.launch_t += dt
+                if self.launch_t >= LAUNCH_MOVE + LAUNCH_FADE:   # there: briefing up
+                    self.launch_t = None
+                    self.title_tunnel.yaw0 = None
+                    game.state = "brief"
             if game.state == "play" and not self.paused:
                 game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed(), fire))
             self.draw()

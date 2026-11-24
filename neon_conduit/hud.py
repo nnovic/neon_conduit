@@ -26,6 +26,7 @@ class Hud:
         self.mid = pygame.font.Font(None, 44)
         self.speedo = Speedo()
         self.band = None            # the title screen's darkened band behind its tunnel
+        self.title_layer = None     # the title screen's text, to fade out at launch
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -63,6 +64,27 @@ class Hud:
         for i, s in enumerate(BRIEF):
             self.text(self.font, s, (mid, top + i * 34), center=True)
 
+    def title_band(self):
+        """The title screen's darkened band, behind the tunnel."""
+        if self.band is None:
+            bh = self.h - 2 * BAND_Y
+            self.band = pygame.Surface((self.w, bh), pygame.SRCALPHA)
+            for y in range(bh):                               # dark in the middle, fading out
+                self.band.fill((4, 6, 18, int(170 * math.sin(math.pi * y / (bh - 1)))), (0, y, self.w, 1))
+        self.screen.blit(self.band, (0, BAND_Y))
+
+    def title_text(self, alpha=255):
+        """The title and the prompt to start, alpha from 0 (gone) to 255."""
+        if self.title_layer is None:
+            self.title_layer = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+            screen, self.screen = self.screen, self.title_layer
+            mid = self.w // 2
+            self.text(self.big, "NEON CONDUIT", (mid, 62), (255, 80, 160), center=True)
+            self.text(self.mid, "Press ENTER to start", (mid, self.h - 44), center=True)
+            self.screen = screen
+        self.title_layer.set_alpha(alpha)
+        self.screen.blit(self.title_layer, (0, 0))
+
     def overlay(self, game, backdrop=None):
         """Darkened screen with the title, game-over or pause text, depending on game.state.
 
@@ -71,12 +93,7 @@ class Hud:
         """
         mid = self.w // 2
         if game.state == "title":
-            if self.band is None:
-                bh = self.h - 2 * BAND_Y
-                self.band = pygame.Surface((self.w, bh), pygame.SRCALPHA)
-                for y in range(bh):                           # dark in the middle, fading out
-                    self.band.fill((4, 6, 18, int(170 * math.sin(math.pi * y / (bh - 1)))), (0, y, self.w, 1))
-            self.screen.blit(self.band, (0, BAND_Y))
+            self.title_band()
         else:
             veil = pygame.Surface((self.w, self.h))
             veil.set_alpha(150)
@@ -84,8 +101,7 @@ class Hud:
         if backdrop:
             backdrop()
         if game.state == "title":
-            self.text(self.big, "NEON CONDUIT", (mid, 62), (255, 80, 160), center=True)
-            self.text(self.mid, "Press ENTER to start", (mid, self.h - 44), center=True)
+            self.title_text()
             return
         if game.state == "over":
             self.text(self.big, "TIME UP", (mid, 190), (255, 70, 60), center=True)
