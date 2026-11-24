@@ -8,7 +8,7 @@ from .config import FOCAL, HORIZON, SCREEN
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
-from .title import TitleFlag
+from .title import TitleFlag, TitleTunnel
 
 
 def read_controls(keys, fire):
@@ -31,17 +31,29 @@ class App:
         self.renderer = Renderer(self.screen, focal, horizon)
         self.hud = Hud(self.screen)
         self.title = TitleFlag(self.screen)
-        self.title_t = 0.0          # clock of the title screen's flag
+        self.title_tunnel = TitleTunnel(self.screen)
+        self.title_t = 0.0          # clock of the title screen's flag and tunnel
+        self.paused = False
+
+    def start(self, reset=True):
+        """Set the racer off; reset: on a fresh track (it already is after the briefing)."""
+        if reset:
+            self.game.reset()
+        self.game.state = "play"
         self.paused = False
 
     def draw(self):
         game = self.game
         if game.state == "title":
             self.title.draw(self.title_t)
-            self.hud.overlay(game)
+            # The tunnel goes over the darkened middle, so it stands out, but under the text.
+            self.hud.overlay(game, lambda: self.title_tunnel.draw(self.title_t))
             return
         self.renderer.draw(game)
         self.hud.draw(game)
+        if game.state == "brief":
+            self.hud.brief()
+            return
         if game.state != "play" or self.paused:
             self.hud.overlay(game)
 
@@ -61,12 +73,17 @@ class App:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_ESCAPE:
                         return
+                    if game.state == "brief":            # any key sets the racer off...
+                        self.start(False)
+                        continue                           # ...and does nothing else
                     if ev.key == pygame.K_SPACE:
                         fire = True
                     if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and game.state != "play":
-                        game.reset()
-                        game.state = "play"
-                        self.paused = False
+                        if game.state == "title":         # to the start line, briefing up
+                            game.reset()
+                            game.state = "brief"
+                        else:
+                            self.start()
                     elif ev.key == pygame.K_p and game.state == "play":
                         self.paused = not self.paused
             self.title_t += dt

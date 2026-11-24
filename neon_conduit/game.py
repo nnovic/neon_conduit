@@ -24,7 +24,7 @@ class Game:
         self.seed = seed
         self.audio = audio or Silent()
         self.best = 0
-        self.state = "title"        # "title", "play" or "over"
+        self.state = "title"        # "title", "brief" (on the start line), "play" or "over"
         self.reset()
 
     def reset(self):

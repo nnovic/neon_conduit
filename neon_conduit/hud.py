@@ -7,6 +7,14 @@ from .config import GATE_SEGS, SEG
 from .speedo import H as SPEEDO_H, W as SPEEDO_W, Speedo
 
 TEXT = (235, 240, 255)
+BAND_Y = 110                    # the title screen's dark band leaves this much clear above and below
+BRIEF = ["Reach each gate before the clock runs out.",
+         "Follow the stars round the outside of bends, or you lose speed.",
+         "",
+         "Left / Right  steer      Up / Down  aim      Space  fire",
+         "P  pause      Esc  quit",
+         "",
+         "Press any key to go"]
 
 
 class Hud:
@@ -17,7 +25,7 @@ class Hud:
         self.big = pygame.font.Font(None, 84)
         self.mid = pygame.font.Font(None, 44)
         self.speedo = Speedo()
-        self.band = None            # the title screen's darkened band behind its text
+        self.band = None            # the title screen's darkened band behind its tunnel
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -45,32 +53,41 @@ class Hud:
         if game.msg[1] > 0:
             self.text(self.mid, game.msg[0], (w // 2, 120), (255, 255, 160), center=True)
 
-    def overlay(self, game):
+    def brief(self):
+        """The briefing, on a dark panel over the race while the racer waits on the start line."""
+        mid = self.w // 2
+        top = (self.h - len(BRIEF) * 34) // 2
+        panel = pygame.Surface((self.w, len(BRIEF) * 34 + 44), pygame.SRCALPHA)
+        panel.fill((4, 6, 18, 160))
+        self.screen.blit(panel, (0, top - 30))
+        for i, s in enumerate(BRIEF):
+            self.text(self.font, s, (mid, top + i * 34), center=True)
+
+    def overlay(self, game, backdrop=None):
         """Darkened screen with the title, game-over or pause text, depending on game.state.
 
-        The title screen has its own backdrop (the flag): only a band behind the text is darkened.
+        The title screen has its own backdrop (the flag): only a band behind the tunnel is darkened.
+        backdrop, if given, is called to draw between that darkening and the text.
         """
         mid = self.w // 2
         if game.state == "title":
             if self.band is None:
-                self.band = pygame.Surface((self.w, 340), pygame.SRCALPHA)
-                for y in range(340):                          # dark in the middle, fading out
-                    self.band.fill((4, 6, 18, int(170 * math.sin(math.pi * y / 339))), (0, y, self.w, 1))
-            self.screen.blit(self.band, (0, 140))
+                bh = self.h - 2 * BAND_Y
+                self.band = pygame.Surface((self.w, bh), pygame.SRCALPHA)
+                for y in range(bh):                           # dark in the middle, fading out
+                    self.band.fill((4, 6, 18, int(170 * math.sin(math.pi * y / (bh - 1)))), (0, y, self.w, 1))
+            self.screen.blit(self.band, (0, BAND_Y))
         else:
             veil = pygame.Surface((self.w, self.h))
             veil.set_alpha(150)
             self.screen.blit(veil, (0, 0))
+        if backdrop:
+            backdrop()
         if game.state == "title":
-            self.text(self.big, "NEON CONDUIT", (mid, 190), (255, 80, 160), center=True)
-            lines = ["Reach each gate before the clock runs out.",
-                     "Follow the stars round the outside of bends, or you lose speed.",
-                     "",
-                     "Left / Right  steer      Up / Down  aim      Space  fire",
-                     "P  pause      Esc  quit",
-                     "",
-                     "Press ENTER to start"]
-        elif game.state == "over":
+            self.text(self.big, "NEON CONDUIT", (mid, 62), (255, 80, 160), center=True)
+            self.text(self.mid, "Press ENTER to start", (mid, self.h - 44), center=True)
+            return
+        if game.state == "over":
             self.text(self.big, "TIME UP", (mid, 190), (255, 70, 60), center=True)
             lines = ["Score %d     Gates %d" % (game.score, game.level),
                      "Best %d" % game.best, "", "Press ENTER to race again"]
