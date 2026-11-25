@@ -114,9 +114,9 @@ class Hud:
         self.tip(game)
 
     def tip(self, game):
-        """The tutorial's tip, if one is up, under the clock; and while the tutorial runs,
-        how to skip it."""
-        if not game.tutorial.done:
+        """The tutorial's tip, if one is up, under the clock; and while it can be skipped,
+        how to."""
+        if game.tutorial.can_skip:
             self.text(self.font, "TAB  skip tutorial", (20, self.h - 36), (170, 180, 210))
         up = game.tutorial.current()
         if up is None:

@@ -1,7 +1,7 @@
 """The tutorial at the start of the first race: tips shown one after the other as the
 racer goes down the opening straight (see START_STRAIGHT in config.py) and the fixed
 course after it."""
-from .config import START_STRAIGHT
+from .config import DRAW, START_STRAIGHT
 
 FADE = 0.3                  # seconds a tip takes to fade in, and to fade out
 
@@ -35,6 +35,7 @@ BOOSTS_AT = BENDS_AT + 2 * BEND         # ...the straight after the bends
 SLOPES_AT = BOOSTS_AT + BOOST_RUN       # ...the slopes
 STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...the last straight
 DOOR_AT = STRAIGHT_AT + LAST_RUN        # ...and the door at its end
+SKIP_UNTIL = DOOR_AT - DRAW             # the tutorial can be skipped until the door comes into view
 
 # Until the tip that starts the clock, there is none: it is hidden and stands still.
 TIPS = [
@@ -56,11 +57,13 @@ class Tutorial:
         self.t = None           # seconds it has been up, or None while it waits for its segment
         self.started = False    # True once the race it belongs to is under way
         self.clock = not any(t.clock for t in tips)   # whether the race clock runs yet
+        self.seg = 0            # the racer's segment
 
     def update(self, dt, seg):
         """Move on dt seconds, the racer being in segment seg. Returns the tip that has
         just gone, if one has."""
         self.started = True
+        self.seg = seg
         if self.i >= len(self.tips):
             return None
         tip = self.tips[self.i]
@@ -79,6 +82,11 @@ class Tutorial:
     def done(self):
         """True once every tip has been shown, or the tutorial skipped."""
         return self.i >= len(self.tips)
+
+    @property
+    def can_skip(self):
+        """True while the tutorial runs and its door is not yet in view."""
+        return not self.done and self.seg < SKIP_UNTIL
 
     def skip(self):
         """Drop the tip up, and every one still to come."""
