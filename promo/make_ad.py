@@ -249,9 +249,8 @@ class Ad:
         g.time_left = 99.0
         g.boost = 99.0
         t = self.txt
-        caps = [(t.neon("HOW FAST", 150, PINK), 0.0, 1.5, 420),
-                (t.neon("CAN YOU", 150, PINK), 1.5, 1.5, 380),
-                (t.neon("GO?", 230, PINK), 1.5, 1.5, 560)]
+        caps = [(t.neon("GAIN", 150, PINK), 0.0, 3.0, 400),
+                (t.neon("SPEED", 230, PINK), 0.5, 2.5, 580)]
         self.cut()
         self.ride(beats * BEAT, caps, speedo=False, overlay=lambda _: self.speedo((VW // 2, VH - 150), 2.3))
         g.boost = 0.0
@@ -432,7 +431,7 @@ class Ad:
         t = self.txt
         logo1 = t.neon("NEON", 230, PINK)
         logo2 = t.neon("CONDUIT", 170, CYAN)
-        tag = t.neon("Ride the light.", 70, WHITE, glow=CYAN)
+        tag = t.neon("How fast can you go?", 70, WHITE, glow=CYAN)
         # cta = t.neon("PLAY NOW", 96, WHITE, glow=PINK)       # call to action: back once there's somewhere to play
         n = int(beats * BEAT * FPS)
         dim = pygame.Surface((VW, VH))
