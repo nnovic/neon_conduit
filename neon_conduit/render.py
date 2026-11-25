@@ -30,6 +30,65 @@ SHIP_WINDING = 1            # sign of a face's screen-space area when it faces t
 SHIP_WINDING_N = 1          # sign that turns the model's face normals outward
 _l = (-0.45, 0.8, -0.4)     # light: from above, a little left and behind
 SHIP_LIGHT = tuple(c / math.sqrt(sum(c * c for c in _l)) for c in _l)
+# The bulkhead round a door at the end of an outdoor run: a thick slab with the door set
+# in it. (x, y) in the door's plane, y down, from the tube's centre;
+# depths in units beyond the door (negative: towards the camera).
+GATE_W = 1.7 * R            # slab half-width
+GATE_TOP = -1.8 * R         # slab top...
+GATE_CHAMFER = 0.5 * R      # ...with its upper corners cut off this much
+GATE_BOTTOM = 1.8 * R       # the slab reaches this far down, below the road
+GATE_DEPTH = 8.0           # slab thickness
+GATE_SLAB = [(-GATE_W, GATE_BOTTOM), (-GATE_W, GATE_TOP + GATE_CHAMFER), (-GATE_W + GATE_CHAMFER, GATE_TOP),
+             (GATE_W - GATE_CHAMFER, GATE_TOP), (GATE_W, GATE_TOP + GATE_CHAMFER), (GATE_W, GATE_BOTTOM)]
+GATE_COLLAR = 1.2          # the door's collar, as a multiple of the tube's cross-section
+GATE_METAL = (40, 44, 64)
+GATE_HAZE = 0.7            # the haze dims it less than the track: it looms out of it
+GATE_LIGHTS = 5             # warning lights over the door, flashing in turn while it slides
+
+
+def _cross(a, b):
+    return a[0] * b[1] - a[1] * b[0]
+
+
+def _ray_hit(outer, d):
+    """Where the ray from (0, 0) along d leaves the convex polygon outer round (0, 0)."""
+    best = None
+    for p, q in zip(outer, outer[1:] + outer[:1]):
+        e = (q[0] - p[0], q[1] - p[1])
+        den = _cross(d, e)
+        if abs(den) < 1e-12:
+            continue
+        t, u = _cross(p, e) / den, _cross(p, d) / den
+        if t > 0 and -1e-9 <= u <= 1 + 1e-9 and (best is None or t < best):
+            best = t
+    return (d[0] * best, d[1] * best)
+
+
+def _inside(pt, poly):
+    """True if point pt is inside polygon poly (even-odd rule)."""
+    x, y, ins = pt[0], pt[1], False
+    for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+        if (y0 > y) != (y1 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+            ins = not ins
+    return ins
+
+
+def ring_around(inner, outer):
+    """The area between polygon inner and the convex polygon outer round it, as polygons
+    pygame can fill: one per edge of inner, out along the rays from the centre (0, 0)
+    through its ends to outer, taking in outer's corners in between."""
+    polys = []
+    for a, b in zip(inner, inner[1:] + inner[:1]):
+        a0 = math.atan2(a[1], a[0])
+        span = wrap(math.atan2(b[1], b[0]) - a0)
+        turn = [(wrap(math.atan2(c[1], c[0]) - a0) * math.copysign(1, span), c) for c in outer]
+        corners = [c for t, c in sorted(turn, key=lambda tc: -tc[0]) if 0 < t < abs(span)]
+        polys.append([a, b, _ray_hit(outer, b)] + corners + [_ray_hit(outer, a)])
+    return polys
+
+
+GATE_FACE = ring_around(TUBE_XS, GATE_SLAB)                     # the slab's face, mouth cut out
+GATE_COLLAR_RING = ring_around(TUBE_XS, [(x * GATE_COLLAR, y * GATE_COLLAR) for x, y in TUBE_XS])
 FLAME_BASE = 0.4            # exhaust flame length when standing still
 FLAME_STRETCH = 3.0         # ...plus this much at top cruising speed
 FLAME_BOOST = 2.2           # ...and the stretch is this much longer while boosting
@@ -116,8 +175,16 @@ class Renderer:
             if "follow" not in e:                   # bursts riding on the sled are drawn with it
                 buckets.setdefault(int(e["z"] // SEG), []).append(e)
 
+        # Past the door at the end of an outdoor run, the tube is only seen from inside,
+        # through the door's mouth: it is painted on a layer, cut to the mouth.
+        gate = next((i for i in range(DRAW) if (i - frac) * SEG > NEAR and tr.is_door(base + i)
+                     and base + i > 0 and tr.outdoor(base + i - 1)), None)
+        inside = self._inside_begin(frames[gate]) if gate is not None else None
+
         for i in range(DRAW - 1, -1, -1):
             si = base + i
+            if gate is not None and i > gate and inside is False:
+                continue                                    # the mouth is off-screen
             if (i + 1 - frac) * SEG > NEAR:
                 fog = min(1.0, (max(0.0, i - frac) / DRAW) ** 1.3 * 1.15)
                 if tr.open[si]:
@@ -131,7 +198,11 @@ class Renderer:
                 self._hint_stars(tr, si)
             for o in buckets.get(si, ()):
                 self._object(o)
+            if i == gate and inside:
+                self._inside_end(inside)
             if tr.is_door(si) and (i - frac) * SEG > NEAR:
+                if si > 0 and tr.outdoor(si - 1):
+                    self._bulkhead(frames, i, si, max(0.0, i - frac) / DRAW)
                 self._door(frames[i], si, max(0.0, i - frac) / DRAW)
 
         self._sled(game)
@@ -423,6 +494,128 @@ class Renderer:
                     pts = [self.proj(zk + u, a, v, h, False, fl) for u, v in piece]
                     if all(pts):
                         pygame.draw.polygon(self.screen, col, [p[:2] for p in pts])
+
+    def _inside_begin(self, frame):
+        """Start painting on the layer for the inside of the tube beyond a door at frame:
+        the box round the door's mouth on screen, or False if the mouth is off-screen."""
+        ox, oy, k = frame
+        cr, sr, pcx, pcy = self.cr, self.sr, self.pcx, self.pcy
+        mouth = [(pcx + k * ((ox + x) * cr - (oy + y) * sr), pcy + k * ((ox + x) * sr + (oy + y) * cr))
+                 for x, y in TUBE_XS]
+        xs, ys = [p[0] for p in mouth], [p[1] for p in mouth]
+        box = pygame.Rect(int(min(xs)) - 1, int(min(ys)) - 1, int(max(xs) - min(xs)) + 3,
+                          int(max(ys) - min(ys)) + 3).clip(self.screen.get_rect())
+        if not box.w or not box.h:
+            return False
+        if getattr(self, "_inside", None) is None or self._inside.get_size() != self.screen.get_size():
+            self._inside = pygame.Surface(self.screen.get_size())
+            self._inside.set_colorkey((0, 0, 0))
+            self._inside_mask = pygame.Surface(self.screen.get_size())
+        layer = self._inside
+        layer.set_clip(box)
+        layer.fill(FOG)
+        self._real_screen, self.screen = self.screen, layer
+        return box, mouth
+
+    def _inside_end(self, inside):
+        """Cut the inside of the tube to the door's mouth and lay it on the screen."""
+        box, mouth = inside
+        layer, mask = self.screen, self._inside_mask
+        self.screen = self._real_screen
+        mask.set_clip(box)
+        mask.fill((0, 0, 0))
+        pygame.draw.polygon(mask, (255, 255, 255), mouth)
+        layer.blit(mask, box, box, special_flags=pygame.BLEND_MULT)   # black outside the mouth...
+        self.screen.blit(layer, box, box)                             # ...which is see-through
+        layer.set_clip(None)
+
+    def _bulkhead(self, frames, i, si, depth):
+        """The structure round a door at the end of an outdoor run: a slab with the tube's
+        mouth cut through it, neon trim in the colours of the tube beyond, and warning
+        lights that flash in turn while the door slides."""
+        scr, f = self.screen, self.f
+        cr, sr, pcx, pcy = self.cr, self.sr, self.pcx, self.pcy
+        ox, oy, k = frames[i]
+        d = f / k
+        # Built straight along the track's heading at the door, whatever it does beyond.
+        j0, j1 = (i, i + 1) if i + 1 < len(frames) else (i - 1, i)
+        dox, doy = (frames[j1][0] - frames[j0][0]) / SEG, (frames[j1][1] - frames[j0][1]) / SEG
+        fog = GATE_HAZE * min(1.0, depth ** 1.3 * 1.15)
+        fc = self.fog_col
+        if depth >= 1.0:
+            return
+
+        def at(pts, n):
+            kk = f / (d + n)
+            cx, cy = ox + dox * n, oy + doy * n
+            return [(pcx + kk * ((cx + x) * cr - (cy + y) * sr), pcy + kk * ((cx + x) * sr + (cy + y) * cr))
+                    for x, y in pts]
+
+        # Close up the mouth fills the screen and all of this is out of sight.
+        mouth = at(TUBE_XS, 0.0)
+        if all(_inside(c, mouth) for c in ((0, 0), (self.w, 0), (0, self.h), (self.w, self.h))):
+            return
+
+        def fill(col, pts):
+            """Fill a polygon, cut to the screen first: close up the bulkhead's are huge."""
+            for c, below, axis in ((-2, False, 0), (self.w + 2, True, 0), (-2, False, 1), (self.h + 2, True, 1)):
+                pts = clip(pts, c, below, axis)
+                if len(pts) < 3:
+                    return
+            pygame.draw.polygon(scr, col, pts)
+
+        def area(poly):
+            return sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]))
+
+        def sides(outline, n0, n1, col):
+            """The sides of outline pushed from depth n0 back to n1 (only those facing the camera)."""
+            front, back = at(outline, n0), at(outline, n1)
+            facing = area(front)
+            m = len(outline)
+            for a in range(m):
+                b = (a + 1) % m
+                quad = [front[a], front[b], back[b], back[a]]
+                if area(quad) * facing >= 0:
+                    continue
+                (x0, y0), (x1, y1) = outline[a], outline[b]
+                ln = math.hypot(x1 - x0, y1 - y0) or 1.0
+                up = max(0.0, (x1 - x0) / ln)           # outward normal pointing up: lit from above
+                fill(fogged(col, 0.55 + 0.6 * up, fog, fc), quad)
+            return front
+
+        pal = tube_palette(self.game.track.stretch[si])
+        neon = mix(pal[1], (255, 255, 255), 0.35)
+
+        def glow_line(surf, pts, width, closed=False):
+            """A neon tube: a wide soft halo, then a bright core."""
+            core = fogged(neon, 1.0, fog * 0.6, fc)
+            draw = (lambda c, w: pygame.draw.lines(surf, c, True, pts, w)) if closed else \
+                   (lambda c, w: pygame.draw.line(surf, c, pts[0], pts[1], w))
+            draw(mix(fogged(GATE_METAL, 1.0, fog, fc), core, 0.45), max(3, int(width * 2.6)))
+            draw(core, max(1, int(width)))
+
+        dist = si * SEG - self.game.sled_z
+        sliding = 0.0 < DOOR_OPEN_AT - dist < DOOR_SLIDE
+        wide = k * 0.45
+        sides(GATE_SLAB, 0.0, GATE_DEPTH, GATE_METAL)
+        col = fogged(GATE_METAL, 1.0, fog, fc)
+        for piece in GATE_FACE:
+            fill(col, at(piece, 0.0))
+        # A neon bar under the lintel.
+        bar = at([(-GATE_W + GATE_CHAMFER, GATE_TOP + 0.2 * R), (GATE_W - GATE_CHAMFER, GATE_TOP + 0.2 * R)], 0.0)
+        glow_line(scr, bar, k * 0.6)
+        # Warning lights over the door: dim at rest, a chase of flashes while it slides.
+        for n in range(GATE_LIGHTS):
+            x = (n - (GATE_LIGHTS - 1) / 2) * 0.45 * R
+            lit = sliding and (int(self.game.t * 14) - n) % 3 == 0
+            c = (255, 210, 70) if lit else (120, 80, 20)
+            p = at([(x, -1.38 * R)], 0.0)[0]
+            pygame.draw.circle(scr, fogged(c, 1.0, fog * (0.5 if lit else 1.0), fc), p, max(1, int(k * 0.6)))
+        # The collar round the door, with neon on its outer edge.
+        col = fogged(GATE_METAL, 1.7, fog, fc)
+        for piece in GATE_COLLAR_RING:
+            fill(col, at(piece, 0.0))
+        glow_line(scr, at([(x * GATE_COLLAR, y * GATE_COLLAR) for x, y in TUBE_XS], 0.0), wide, closed=True)
 
     def _door(self, frame, i, depth):
         """Sliding door across the mouth of segment i; it parts as the sled draws near.
