@@ -26,7 +26,8 @@ COURSE = [
     (BOOST_RUN, 0.0, 0.0),  # a straight, with the ring of boost pads
     (BEND, 0.0, 0.2),       # up...
     (BEND, 0.0, -0.2),      # ...and down
-    (130, 0.0, 0.0),        # a straight for the rest of the tutorial, while the clock comes in
+    (100, 0.0, 0.0),        # a straight for the rest of the tutorial, while the clock comes in,
+                            # ending at a door into the real game (see Track)
 ]
 BENDS_AT = START_STRAIGHT               # segment where the first bend begins
 BOOSTS_AT = BENDS_AT + 2 * BEND         # ...the straight after the bends

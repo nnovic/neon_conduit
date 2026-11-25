@@ -28,9 +28,11 @@ class Track:
         self.open = []             # outdoors, ground-level: a flat road between kerbs
         self.air = []              # outdoors, in the air: a see-through tube
         self.width = []            # floor half-width at the start of each segment
-        self.stretch = []          # per segment: how many outdoor runs come before it
+        self.stretch = []          # per segment: how many outdoor runs (and the tutorial's
+                                   # door) come before it
         self.objects = []          # dicts: kind, z, a, ...
         self.door_angles = {}
+        self.doors = set()         # doors in the tube that follow no outdoor run (see is_door)
         self.kerb_cols = {}
         self.tube_styles = {}
         self.no_star = set()       # segments whose star would overlap a boost pad
@@ -47,6 +49,11 @@ class Track:
         self._section(START_STRAIGHT, 0.0, 0.0, False, 0, empty=True)
         for n, c, p in intro:
             self._section(n, c, p, False, 0, empty=True)
+        if intro:
+            # The intro ends at a door, into a new stretch of tube (its own pattern and
+            # colours): the real game.
+            self.doors.add(len(self.curv))
+            self.runs += 1
 
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""
@@ -87,8 +94,9 @@ class Track:
         return self.open[i] or self.air[i]
 
     def is_door(self, i):
-        """True where segment i is tube following an outdoor section: a door closes it off."""
-        return 0 < i < len(self.open) and self.outdoor(i - 1) and not self.outdoor(i)
+        """True where a door closes off segment i: tube following an outdoor section, or the
+        end of the intro."""
+        return i in self.doors or (0 < i < len(self.open) and self.outdoor(i - 1) and not self.outdoor(i))
 
     def door_angle(self, i):
         """Tilt of door i's split line: vertical, horizontal or either diagonal, picked at
