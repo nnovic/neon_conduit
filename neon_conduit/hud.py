@@ -17,7 +17,7 @@ TITLE_STROKE = (20, 0, 40)
 TITLE_GLOW = (255, 50, 170)
 BAND_Y = 110                    # the title screen's dark band leaves this much clear above and below
 # The title screen's credits banner, scrolling along the bottom: a summary of CREDITS.md.
-CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (opengameart.org)     \u2022     '
+CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (CC BY-SA 3.0, opengameart.org)     \u2022     '
                 'Font: Russo One by Jovanny Lemonad (SIL Open Font License 1.1)     \u2022     ')
 CREDITS_H = 26                  # height of the banner's strip
 CREDITS_SPEED = 70.0            # pixels per second it scrolls to the left

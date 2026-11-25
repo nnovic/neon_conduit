@@ -10,7 +10,8 @@ project's own code.
 - Used as the title screen music
 - File: [`neon_conduit/assets/Hero_Immortal.mp3`](neon_conduit/assets/Hero_Immortal.mp3)
 - Source: [opengameart.org/content/hero-immortal](https://opengameart.org/content/hero-immortal)
-- License: **TODO: copy the license listed on the source page**
+- License: [Creative Commons Attribution-ShareAlike 3.0 (CC BY-SA 3.0)](https://creativecommons.org/licenses/by-sa/3.0/).
+  The file is used unmodified.
 
 ## Font
 
