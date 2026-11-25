@@ -30,6 +30,15 @@ project's own code.
 - License: [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
   The file is used unmodified.
 
+**"Rock/Metal Slide"** by **Varkalandar** (2019)
+- Played when a door in the tube slides open, louder as the racer draws near
+- File: [`neon_conduit/assets/rock_metal_slide_2.wav`](neon_conduit/assets/rock_metal_slide_2.wav)
+- Source: [opengameart.org/content/rockmetal-slide](https://opengameart.org/content/rockmetal-slide)
+- License: offered under CC BY 4.0, CC BY 3.0, CC BY-SA 4.0, CC BY-SA 3.0 or
+  [OGA-BY 3.0](https://opengameart.org/content/oga-by-30-faq); used here under
+  [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+  The file is used unmodified.
+
 ## Font
 
 **Russo One** by **Jovanny Lemonad** (jovanny.ru), 2011–2012, with Reserved Font Name "Russo"

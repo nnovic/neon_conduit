@@ -29,6 +29,8 @@ STAR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "completetask_0.w
 STAR_SOUND_VOLUME = 0.5
 BOOST_SOUND = os.path.join(os.path.dirname(__file__), "assets", "Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav")   # see CREDITS.md
 BOOST_SOUND_VOLUME = 0.6
+DOOR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "rock_metal_slide_2.wav")   # see CREDITS.md
+DOOR_SOUND_VOLUME = 1.0   # the recording itself is quiet (peaks near -14 dBFS)
 
 # ----------------------------------------------------------------- camera
 PLAYER_D = 12.0         # how far ahead of the camera the sled sits
@@ -55,6 +57,8 @@ AIR_CHANCE = 0.25       # chance that an open run is in the air rather than grou
 
 # ------------------------------------------------------------------ doors
 DOOR_OPEN_AT = 115.0    # distance ahead of the sled at which a tube door starts to open
+DOOR_HEAR_NEAR = 12.0   # the door's slide is at full volume at the door, half as loud this far
+                        # from it, a tenth as loud at DOOR_OPEN_AT (smaller: a sharper swell)
 DOOR_SLIDE = 70.0       # distance over which it slides fully open
 
 # -------------------------------------------------------------- fast line

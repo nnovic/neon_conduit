@@ -9,7 +9,7 @@ from collections import namedtuple
 
 from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
-                     DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
+                     DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
                      DRONE_SPEED, RING_AHEAD, RING_DRONES)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
@@ -66,6 +66,7 @@ class Game:
         self.gate_from = 0.0    # depth from which the run to the next gate counts: the last
                                 # gate passed, or where the clock started
         self.skipping = None    # seconds into skipping the tutorial, or None
+        self.door_sounds = []   # (channel, sound, depth) of each door sliding open within earshot
 
     @property
     def veil(self):
@@ -176,7 +177,19 @@ class Game:
         # Doors back into the tube start sliding open as the sled draws near.
         for i in range(int((self.prev_z + DOOR_OPEN_AT) // SEG) + 1, int((pz + DOOR_OPEN_AT) // SEG) + 1):
             if tr.is_door(i):
-                self.audio.play("door")
+                channel = self.audio.play("door")
+                if channel:
+                    self.door_sounds.append((channel, channel.get_sound(), i * SEG))
+        self._door_volume(pz)
+
+    def _door_volume(self, pz):
+        """A door's slide grows louder as the sled draws near it, and fades once it is past,
+        falling off with distance as a real sound would."""
+        # Drop the slides that are over, even if their channel now plays something else.
+        self.door_sounds = [(c, snd, z) for c, snd, z in self.door_sounds
+                            if c.get_busy() and c.get_sound() is snd]
+        for channel, _, z in self.door_sounds:
+            channel.set_volume(DOOR_HEAR_NEAR / (DOOR_HEAR_NEAR + abs(z - pz)))
 
     def _steer(self, dt, steer, pz, seg):
         """Steering and gravity round the tube wall, kerbs in the open, and the fast line."""

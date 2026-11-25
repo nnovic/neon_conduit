@@ -5,7 +5,8 @@ from array import array
 
 import pygame
 
-from .config import BOOST_SOUND, BOOST_SOUND_VOLUME, STAR_SOUND, STAR_SOUND_VOLUME
+from .config import (BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME, STAR_SOUND,
+                     STAR_SOUND_VOLUME)
 
 
 class Audio:
@@ -24,7 +25,8 @@ class Audio:
                 "boom": self._noise(0.22, 0.3),
                 "gate": self._sweep(500, 1300, 0.45, 0.3),
                 "scrape": self._noise(0.14, 0.22),
-                "door": self._sweep(160, 60, 0.6, 0.18),
+                "door": self._file(DOOR_SOUND, DOOR_SOUND_VOLUME)
+                        or self._sweep(160, 60, 0.6, 0.18),
                 "star": self._file(STAR_SOUND, STAR_SOUND_VOLUME)
                         or self._sweep(1400, 2100, 0.07, 0.12),
             }
@@ -64,8 +66,10 @@ class Audio:
         return pygame.mixer.Sound(buffer=buf.tobytes())
 
     def play(self, name):
+        """Play a sound; the Channel it plays on (to change its volume as it plays), or None."""
         if self.ok:
-            self.sounds[name].play()
+            return self.sounds[name].play()
+        return None
 
     def music(self, path, volume=1.0, fade=0.0):
         """Loop the music file at path, fading in over fade seconds. A file that can't be
@@ -89,7 +93,7 @@ class Silent:
     """Stands in for Audio where no sound is wanted (tests, headless rendering)."""
 
     def play(self, name):
-        pass
+        return None
 
     def music(self, path, volume=1.0, fade=0.0):
         pass
