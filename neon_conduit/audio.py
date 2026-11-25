@@ -1,9 +1,11 @@
-"""Sound effects, synthesized at start-up, and the music, streamed from assets/."""
+"""Sound effects, mostly synthesized at start-up, and the music, streamed from assets/."""
 import math
 import random
 from array import array
 
 import pygame
+
+from .config import STAR_SOUND, STAR_SOUND_VOLUME
 
 
 class Audio:
@@ -22,11 +24,22 @@ class Audio:
                 "gate": self._sweep(500, 1300, 0.45, 0.3),
                 "scrape": self._noise(0.14, 0.22),
                 "door": self._sweep(160, 60, 0.6, 0.18),
-                "star": self._sweep(1400, 2100, 0.07, 0.12),
+                "star": self._file(STAR_SOUND, STAR_SOUND_VOLUME)
+                        or self._sweep(1400, 2100, 0.07, 0.12),
             }
             self.ok = True
         except pygame.error:
             pass
+
+    def _file(self, path, vol):
+        """The sound in the file at path, or None if it can't be loaded."""
+        try:
+            sound = pygame.mixer.Sound(path)
+        except (pygame.error, OSError) as e:
+            print("No sound (%s): %s" % (path, e))
+            return None
+        sound.set_volume(vol)
+        return sound
 
     def _sweep(self, f0, f1, dur, vol):
         """Square-wave pitch sweep from f0 to f1 Hz, fading out."""

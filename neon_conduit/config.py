@@ -25,6 +25,8 @@ PATTERNS_FILE = os.path.join(os.path.dirname(__file__), "conduit_patterns.txt") 
 TITLE_MUSIC = os.path.join(os.path.dirname(__file__), "assets", "Hero_Immortal.mp3")   # see CREDITS.md
 TITLE_MUSIC_VOLUME = 0.6
 TITLE_MUSIC_FADE = 1.0  # seconds the title music takes to fade in
+STAR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "completetask_0.wav")   # see CREDITS.md
+STAR_SOUND_VOLUME = 0.5
 
 # ----------------------------------------------------------------- camera
 PLAYER_D = 12.0         # how far ahead of the camera the sled sits
