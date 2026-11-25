@@ -443,17 +443,6 @@ class Renderer:
             if all(pts):
                 pygame.draw.lines(scr, (255, 255, 160), False, [p[:2] for p in pts],
                                   max(2, int(pts[0][2] * 0.5)))
-        elif kind == "sparkle":                               # hint star picked up
-            p = proj(z, o["a"], 0.0, 0.3)
-            if p:
-                t = o["age"] / 0.45
-                r = p[2] * (0.8 + 2.5 * t)
-                col = mix((255, 255, 230), (255, 200, 60), t)
-                for j in range(8):
-                    ang = j * math.pi / 4
-                    pygame.draw.line(scr, col, (p[0] + 0.4 * r * math.cos(ang), p[1] + 0.4 * r * math.sin(ang)),
-                                     (p[0] + r * math.cos(ang), p[1] + r * math.sin(ang)),
-                                     max(1, int(p[2] * 0.25 * (1 - t)) + 1))
         elif "age" in o:                                      # explosion (or exhaust burst)
             p = proj(z, o["a"], 0.0, o.get("h", 1.5), True)
             if p:

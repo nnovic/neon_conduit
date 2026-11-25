@@ -437,7 +437,6 @@ class Game:
                     and lat_dist(self.theta, tr.line(i), tr.open[i]) < LINE_TOL):
                 self.stars_taken.add(i)
                 self.score += STAR_SCORE
-                self.effects.append({"kind": "sparkle", "z": i * SEG, "a": tr.line(i), "age": 0.0})
                 self.audio.play("star")
 
     def _effects(self, dt):
