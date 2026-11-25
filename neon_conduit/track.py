@@ -4,10 +4,10 @@ import random
 
 from .config import (AIR_CHANCE, BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
                      LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
-                     TUNNEL_MIN, WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
+                     START_PATTERN, START_STRAIGHT, TUNNEL_MIN, WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import kerb_cols
-from .patterns import PATTERNS
+from .patterns import BY_NAME, PATTERNS
 from .themes import THEMES, of_kind
 
 
@@ -35,7 +35,10 @@ class Track:
         self.runs = 0
         self.tube_start = 0        # where the current stretch of tube began
         self.next_gate = GATE_SEGS
-        self._section(30, 0.0, 0.0, False, 0, empty=True)
+        # The start: a long straight with nothing on it, in the first tunnel's own pattern.
+        if START_PATTERN in BY_NAME:
+            self.tube_styles[0] = START_PATTERN
+        self._section(START_STRAIGHT, 0.0, 0.0, False, 0, empty=True)
 
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""
