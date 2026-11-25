@@ -16,6 +16,12 @@ TITLE_STOPS = ((0.0, (255, 250, 255)), (0.42, (255, 120, 220)), (0.52, (255, 40,
 TITLE_STROKE = (20, 0, 40)
 TITLE_GLOW = (255, 50, 170)
 BAND_Y = 110                    # the title screen's dark band leaves this much clear above and below
+# The title screen's credits banner, scrolling along the bottom: a summary of CREDITS.md.
+CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (opengameart.org)     \u2022     '
+                'Font: Russo One by Jovanny Lemonad (SIL Open Font License 1.1)     \u2022     ')
+CREDITS_H = 26                  # height of the banner's strip
+CREDITS_SPEED = 70.0            # pixels per second it scrolls to the left
+CREDITS_COL = (190, 200, 230)
 BRIEF = ["Reach each gate before the clock runs out.",
          "Follow the stars round the outside of bends, or you lose speed.",
          "",
@@ -77,6 +83,8 @@ class Hud:
         self.speedo = Speedo()
         self.band = None            # the title screen's darkened band behind its tunnel
         self.title_layer = None     # the title screen's text, to fade out at launch
+        self.credits_strip = None   # the credits banner's strip, and its line of text
+        self.credits_text = None
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -132,10 +140,29 @@ class Hud:
             title, pad = neon_title("NEON CONDUIT", int(self.w * TITLE_WIDTH))
             self.screen.blit(title, title.get_rect(midtop=(mid, 18 - pad)))
             prompt = pygame.font.Font(TITLE_FONT, 30)
-            self.text(prompt, "Press ENTER to start", (mid, self.h - 44), center=True)
+            self.text(prompt, "Press ENTER to start", (mid, self.h - CREDITS_H - 34), center=True)
             self.screen = screen
         self.title_layer.set_alpha(alpha)
         self.screen.blit(self.title_layer, (0, 0))
+
+    def credits(self, t, alpha=255):
+        """The credits banner along the bottom of the title screen, scrolled to time t,
+        alpha from 0 (gone) to 255."""
+        if self.credits_strip is None:
+            self.credits_strip = pygame.Surface((self.w, CREDITS_H))
+            font = pygame.font.Font(TITLE_FONT, 15)
+            self.credits_text = font.render(CREDITS_LINE, True, CREDITS_COL)
+        strip, img = self.credits_strip, self.credits_text
+        strip.fill((4, 6, 18))
+        pygame.draw.line(strip, (255, 50, 170), (0, 0), (self.w, 0))     # a neon edge on top
+        tw = img.get_width()
+        x = -(t * CREDITS_SPEED % tw)
+        y = (CREDITS_H - img.get_height()) // 2 + 1
+        while x < self.w:                                                # the line, end to end
+            strip.blit(img, (int(x), y))
+            x += tw
+        strip.set_alpha(int(220 * alpha / 255))
+        self.screen.blit(strip, (0, self.h - CREDITS_H))
 
     def overlay(self, game, backdrop=None):
         """Darkened screen with the title, game-over or pause text, depending on game.state.

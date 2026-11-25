@@ -61,6 +61,7 @@ class App:
             self.title.draw(self.title_t)
             # The tunnel goes over the darkened middle, so it stands out, but under the text.
             self.hud.overlay(game, lambda: self.title_tunnel.draw(self.title_t))
+            self.hud.credits(self.title_t)
             return
         self.renderer.draw(game)
         self.hud.draw(game)
@@ -82,6 +83,7 @@ class App:
         scr.blit(veil, (0, 0))
         self.title_tunnel.draw(self.title_t, u)
         self.hud.title_text(int(255 * (1 - u)))
+        self.hud.credits(self.title_t, int(255 * (1 - u)))
         if s > LAUNCH_MOVE:
             title = scr.copy()
             self.renderer.draw(self.game)
