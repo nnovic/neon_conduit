@@ -115,5 +115,10 @@ BASE_SPEED = 100.0      # cruising speed at the first gate
 SPEED_CAP = 135.0       # cruising speed stops rising here
 BOOST_MULT = 1.65       # speed multiplier while boosting
 BOOST_TIME = 3.5        # seconds a boost pad keeps it going
+BOOST_FOCAL = 0.8       # the camera's focal length at full boost speed, times its usual one: a
+                        # wider view, the tube rushing past; eased in and out with the speed...
+BOOST_WARP = 0.5        # ...and the perspective bent, as much more at full boost: sizes fall
+                        # off as 1 / depth ** (1 + this), the sled's depth keeping its size, so
+                        # near walls swell and the far tube is squeezed towards the middle
 CRASH_KEEP = 0.2        # fraction of speed kept after hitting a drone
 INVINCIBLE_TIME = BOOST_TIME   # seconds a boost pad also makes the sled ram through drones unharmed

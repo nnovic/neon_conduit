@@ -11,7 +11,7 @@ import random
 import pygame
 
 from . import config
-from .config import (BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
+from .config import (BOOST_FOCAL, BOOST_WARP, PLAYER_D, BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
                      FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES,
                      SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, SPEED_CAP, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
@@ -238,7 +238,21 @@ class Renderer:
             ox_s = random.uniform(-1, 1) * 22 * game.shake
             oy_s = random.uniform(-1, 1) * 22 * game.shake
         self.pcx, self.pcy = self.cx + ox_s, self.cy + oy_s
-        self.f = self.focal * (0.88 if game.boost > 0 else 1.0)
+        self.f = self.focal * (1 + (BOOST_FOCAL - 1) * game.rush)   # wider the faster...
+        self.warp = BOOST_WARP * game.rush                          # ...and bent the more
+
+    def scale(self, d):
+        """Screen pixels per world unit at depth d: f / d, bent by the boost's warp (see
+        BOOST_WARP), which leaves the sled's depth as it is."""
+        if self.warp:
+            return self.f / d * (PLAYER_D / d) ** self.warp
+        return self.f / d
+
+    def depth(self, k):
+        """The depth at which scale is k: scale's inverse."""
+        if self.warp:
+            return (self.f * PLAYER_D ** self.warp / k) ** (1 / (1 + self.warp))
+        return self.f / k
 
     def _outdoors(self, tr, base):
         """The backdrop to show, and the colour of the fog.
@@ -309,7 +323,7 @@ class Renderer:
         ccx, ccy = self._centre(z)
         px = ccx + wx - self.camx
         py = ccy + wy - self.camy
-        k = self.f / d
+        k = self.scale(d)
         cr, sr = self.cr, self.sr
         return self.pcx + k * (px * cr - py * sr), self.pcy + k * (px * sr + py * cr), k
 
@@ -319,7 +333,7 @@ class Renderer:
         rings, orings, frames = [], [], []
         for i in range(DRAW + 1):
             d = max(NEAR, (i - frac) * SEG)
-            k = self.f / d
+            k = self.scale(d)
             ox, oy = self.rcx[i] - self.camx, self.rcy[i] - self.camy
             frames.append((ox, oy, k))
             pts = []
@@ -547,10 +561,10 @@ class Renderer:
         """The structure round a door at the end of an outdoor run: a slab with the tube's
         mouth cut through it, neon trim in the colours of the tube beyond, and warning
         lights that flash in turn while the door slides."""
-        scr, f = self.screen, self.f
+        scr = self.screen
         cr, sr, pcx, pcy = self.cr, self.sr, self.pcx, self.pcy
         ox, oy, k = frames[i]
-        d = f / k
+        d = self.depth(k)
         # Built straight along the track's heading at the door, whatever it does beyond.
         j0, j1 = (i, i + 1) if i + 1 < len(frames) else (i - 1, i)
         dox, doy = (frames[j1][0] - frames[j0][0]) / SEG, (frames[j1][1] - frames[j0][1]) / SEG
@@ -560,7 +574,7 @@ class Renderer:
             return
 
         def at(pts, n):
-            kk = f / (d + n)
+            kk = self.scale(d + n)
             cx, cy = ox + dox * n, oy + doy * n
             return [(pcx + kk * ((cx + x) * cr - (cy + y) * sr), pcy + kk * ((cx + x) * sr + (cy + y) * cr))
                     for x, y in pts]

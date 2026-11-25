@@ -5,7 +5,7 @@ import time
 import pygame
 
 from .audio import Audio
-from .config import BOOST_MULT, FOCAL, HORIZON, SCREEN, TITLE_MUSIC, TITLE_MUSIC_FADE, TITLE_MUSIC_VOLUME
+from .config import FOCAL, HORIZON, SCREEN, TITLE_MUSIC, TITLE_MUSIC_FADE, TITLE_MUSIC_VOLUME
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
@@ -68,9 +68,7 @@ class App:
     def boost_pixel(self):
         """How wide the big pixels are for the racer's speed: 1 (none) at cruising speed or
         below, BOOST_PIXEL at full boost speed, in between as the speed rises or falls."""
-        game = self.game
-        over = (game.speed / game.max_speed - 1) / (BOOST_MULT - 1)
-        return 1 + (BOOST_PIXEL - 1) * max(0.0, min(1.0, over))
+        return 1 + (BOOST_PIXEL - 1) * self.game.rush
 
     def pixelate(self):
         """Blow the frame drawn so far up from a smaller copy, nearest pixel only: big,

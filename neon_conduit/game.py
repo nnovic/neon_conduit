@@ -108,6 +108,13 @@ class Game:
         return max(0.0, min(1.0, (pz - self.gate_from) / max(1e-6, nxt - self.gate_from)))
 
     @property
+    def rush(self):
+        """How far the speed is above cruising: 0 at cruising speed or below, 1 at full boost
+        speed. It rises as a boost kicks in and falls back as it wears off."""
+        over = (self.speed / self.max_speed - 1) / (BOOST_MULT - 1)
+        return max(0.0, min(1.0, over))
+
+    @property
     def max_speed(self):
         return min(SPEED_CAP, BASE_SPEED + 4.0 * self.level)
 
