@@ -1,0 +1,89 @@
+"""The tutorial at the start of the first race: tips shown one after the other as the
+racer goes down the opening straight (see START_STRAIGHT in config.py) and the fixed
+course after it."""
+from .config import START_STRAIGHT
+
+FADE = 0.3                  # seconds a tip takes to fade in, and to fade out
+
+
+class Tip:
+    def __init__(self, at, text, secs=4.0, then=None, clock=False):
+        self.at = at            # segment the racer reaches when the tip comes up
+        self.text = text
+        self.secs = secs        # seconds it stays up
+        self.then = then        # what happens as it goes (see Game._tutorial_event), or None
+        self.clock = clock      # True: the race clock shows and starts running as it comes up
+
+
+# The course the tutorial runs on, after the opening straight: the same every time, with
+# nothing on it. Sections of (length in segments, peak curvature, peak pitch); the random
+# track carries on after them.
+BEND = 48                   # segments in each bend, and in each slope
+BOOST_RUN = 134             # segments of straight between the bends and the slopes
+COURSE = [
+    (BEND, 0.3, 0.0),       # a bend to the right, with hint stars round its outside...
+    (BEND, -0.3, 0.0),      # ...then one to the left
+    (BOOST_RUN, 0.0, 0.0),  # a straight, with the ring of boost pads
+    (BEND, 0.0, 0.2),       # up...
+    (BEND, 0.0, -0.2),      # ...and down
+    (130, 0.0, 0.0),        # a straight for the rest of the tutorial, while the clock comes in
+]
+BENDS_AT = START_STRAIGHT               # segment where the first bend begins
+BOOSTS_AT = BENDS_AT + 2 * BEND         # ...the straight after the bends
+SLOPES_AT = BOOSTS_AT + BOOST_RUN       # ...the slopes
+STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...and the last straight
+
+# Until the tip that starts the clock, there is none: it is hidden and stands still.
+TIPS = [
+    Tip(18, "Destroy drones before they hit you!", 3.0, then="drone_ring"),   # about 1.5 s in
+    Tip(BENDS_AT - 10, "Stars show the optimal path", 4.0),   # going into the bends
+    Tip(BOOSTS_AT, "Boosts also make you invincible", 3.0, then="boost_ring"),   # out of the bends
+    Tip(STRAIGHT_AT, "Do not run out of time!", 4.0, clock=True),   # past the slopes
+]
+
+
+class Tutorial:
+    """Which tip is up, and for how long: one at a time, in order, each once its segment
+    is reached and the tip before it has gone."""
+
+    def __init__(self, tips=TIPS):
+        self.tips = tips
+        self.i = 0              # the tip up, or next to come up
+        self.t = None           # seconds it has been up, or None while it waits for its segment
+        self.started = False    # True once the race it belongs to is under way
+        self.clock = not any(t.clock for t in tips)   # whether the race clock runs yet
+
+    def update(self, dt, seg):
+        """Move on dt seconds, the racer being in segment seg. Returns the tip that has
+        just gone, if one has."""
+        self.started = True
+        if self.i >= len(self.tips):
+            return None
+        tip = self.tips[self.i]
+        if self.t is None:
+            if seg < tip.at:
+                return None
+            self.t = 0.0
+            self.clock = self.clock or tip.clock
+        self.t += dt
+        if self.t >= tip.secs:
+            self.i, self.t = self.i + 1, None
+            return tip
+        return None
+
+    @property
+    def done(self):
+        """True once every tip has been shown, or the tutorial skipped."""
+        return self.i >= len(self.tips)
+
+    def skip(self):
+        """Drop the tip up, and every one still to come."""
+        self.i, self.t = len(self.tips), None
+        self.clock = True
+
+    def current(self):
+        """The tip up and its opacity (0 .. 1), or None."""
+        if self.t is None:
+            return None
+        tip = self.tips[self.i]
+        return tip, max(0.0, min(1.0, self.t / FADE, (tip.secs - self.t) / FADE))

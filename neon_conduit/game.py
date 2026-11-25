@@ -10,9 +10,11 @@ from collections import namedtuple
 from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
                      DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
-                     SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME)
+                     SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
+                     DRONE_SPEED, RING_AHEAD, RING_DRONES)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
+from .tutorial import COURSE, TIPS, Tutorial
 
 # steer: -1 .. 1, fire: bool, aim: -1 (lowered) .. 0 (along the slope) .. 1 (raised)
 Controls = namedtuple("Controls", "steer fire aim", defaults=(0,))
@@ -25,11 +27,15 @@ class Game:
         self.audio = audio or Silent()
         self.best = 0
         self.state = "title"        # "title", "brief" (on the start line), "play" or "over"
+        self.tutorial = None
         self.reset()
 
     def reset(self):
+        # The tutorial is for the first race only: once that is under way, later ones get none.
+        self.tutorial = Tutorial(() if self.tutorial and self.tutorial.started else TIPS)
         self.rng = random.Random(self.seed)
-        self.track = Track(self.rng)
+        # With a tutorial, the track starts on its fixed course; the random track comes after.
+        self.track = Track(self.rng, COURSE if self.tutorial.tips else ())
         self.cam_z = 0.0
         self.theta = 0.0        # sled angle on the wall, 0 = floor
         self.omega = 0.0
@@ -57,6 +63,17 @@ class Game:
         self.flat = 0.0         # 0 in the tube, 1 on the flat floor of an open section
         self.off_line = 0.0     # 0 on the fast line (or on a straight), 1 far off it in a bend
         self.scrape_cd = 0.0
+        self.gate_from = 0.0    # depth from which the run to the next gate counts: the last
+                                # gate passed, or where the clock started
+
+    @property
+    def gate_progress(self):
+        """How far the racer has come from the last gate (or the clock's start) to the
+        next one, 0 .. 1."""
+        tr, pz = self.track, self.sled_z
+        nxt = min((o["z"] for o in tr.objects if o["kind"] == "gate" and o["z"] > pz),
+                  default=tr.next_gate * SEG)               # the next gate, placed or not yet
+        return max(0.0, min(1.0, (pz - self.gate_from) / max(1e-6, nxt - self.gate_from)))
 
     @property
     def max_speed(self):
@@ -91,7 +108,14 @@ class Game:
         self.shake = max(0.0, self.shake - dt)
         self.flash = max(0.0, self.flash - dt)
         self.msg = (self.msg[0], self.msg[1] - dt)
-        self.time_left -= dt
+        clock = self.tutorial.clock
+        gone = self.tutorial.update(dt, seg)
+        if gone and gone.then:
+            self._tutorial_event(gone.then, pz)
+        if self.tutorial.clock and not clock:   # the clock starts: so does the run to the next gate
+            self.gate_from = pz
+        if self.tutorial.clock:             # the tutorial holds the clock back for a while
+            self.time_left -= dt
         if self.time_left <= 0:
             self.time_left = 0.0
             self.best = max(self.best, self.score)
@@ -189,11 +213,11 @@ class Game:
     def _drone_later(self, o, wait, dt):
         """Where drone o will be after wait seconds: depth and cross-section point.
 
-        Mirrors the drone's moves in _objects (forward at half top speed, swaying on its
-        sine). Shots and drones both move in the frame a shot is fired, but the drone's
+        Mirrors the drone's moves in _objects (forward at its share of top speed, swaying
+        on its sine). Shots and drones both move in the frame a shot is fired, but the drone's
         sway reads the clock already advanced for that frame, hence the - dt.
         """
-        z = o["z"] + 0.5 * self.max_speed * wait
+        z = o["z"] + o.get("v", DRONE_SPEED) * self.max_speed * wait
         a = o["a0"] + o["amp"] * math.sin((self.t + wait - dt) * o["w"] + o["ph"])
         flat = self.track.open[int(z // SEG)]
         if flat:
@@ -226,7 +250,7 @@ class Game:
         A shot's place at any depth is its start, plus its drift times the distance, plus
         the track's turning (the same whatever the drift): solving for the drift is exact.
         """
-        closing = v - 0.5 * self.max_speed
+        closing = v - o.get("v", DRONE_SPEED) * self.max_speed
         if closing <= 0:
             return None
         wait = (o["z"] - z0) / closing
@@ -280,6 +304,22 @@ class Game:
         if not inside(b["x"], b["y"], tr.open[int(end // SEG)]):
             b["life"] = 0
 
+    def _tutorial_event(self, name, pz):
+        """What a tutorial tip sets off as it goes."""
+        z = pz + RING_AHEAD
+        ring = [2 * math.pi * k / RING_DRONES for k in range(RING_DRONES)]   # from the floor's middle
+        if name == "drone_ring":
+            # Drones evenly round the tube, too close together to slip between: the only
+            # way through is to shoot one. They hang still, so the racer rushes at them.
+            for a in ring:
+                self.track.objects.append({"kind": "drone", "z": z, "v": 0.0, "a0": a, "a": 0.0,
+                                           "amp": 0.0, "w": 0.0, "ph": 0.0})
+        elif name == "boost_ring":
+            # Boost pads evenly round the tube, too close together to miss. Spaced from the
+            # floor's middle, none of them straddles a corner between floor and wall.
+            for a in ring:
+                self.track.objects.append({"kind": "boost", "z": z, "a": a})
+
     def _objects(self, dt, pz):
         """Drones, boost pads and gates: movement, hits and pick-ups."""
         tr = self.track
@@ -292,7 +332,7 @@ class Game:
             flat = kind != "gate" and tr.open[int(z // SEG)]
             if kind == "drone":
                 if z - pz < 320:
-                    o["z"] = z = z + 0.5 * self.max_speed * dt
+                    o["z"] = z = z + o.get("v", DRONE_SPEED) * self.max_speed * dt
                 o["a"] = o["a0"] + o["amp"] * math.sin(self.t * o["w"] + o["ph"])
                 if flat:
                     lim = floor_limit(1.0, tr.hw_at(z))
@@ -331,9 +371,10 @@ class Game:
                 if self.prev_z < z <= pz:
                     alive = False
                     self.level += 1
+                    self.gate_from = z
+                    self.score += 1000
                     bonus = max(11.0, 16.0 - 0.6 * self.level)
                     self.time_left += bonus
-                    self.score += 1000
                     self.msg = ("GATE %d   +%d s" % (self.level, bonus), 2.0)
                     self.audio.play("gate")
             if alive:

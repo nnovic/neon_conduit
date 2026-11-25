@@ -19,7 +19,9 @@ class Track:
     tilts) use separate generators and never disturb it.
     """
 
-    def __init__(self, rng):
+    def __init__(self, rng, intro=()):
+        """intro: sections of (length, curvature, pitch) to follow the opening straight,
+        with nothing on them, before the random track (the tutorial's course)."""
         self.rng = rng
         self.curv = []
         self.pitch = []
@@ -38,7 +40,13 @@ class Track:
         # The start: a long straight with nothing on it, in the first tunnel's own pattern.
         if START_PATTERN in BY_NAME:
             self.tube_styles[0] = START_PATTERN
+        # No gate on the intro (the tutorial has no clock yet): the first one is the first
+        # on the usual grid past its end.
+        end = START_STRAIGHT + sum(n for n, _, _ in intro)
+        self.next_gate = max(GATE_SEGS, -(-end // GATE_SEGS) * GATE_SEGS)
         self._section(START_STRAIGHT, 0.0, 0.0, False, 0, empty=True)
+        for n, c, p in intro:
+            self._section(n, c, p, False, 0, empty=True)
 
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""

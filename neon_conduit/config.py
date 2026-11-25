@@ -41,7 +41,7 @@ WALL_T = WALL_H         # ...and their thickness
 OPEN_CHANCE = 0.12      # chance that the next stretch of track is an open run
 OPEN_RUN = (2, 4)       # sections chained into one open run
 TUNNEL_MIN = 100        # segments of tube at least between two open runs (about 4 s at cruising speed)
-START_STRAIGHT = 150    # segments of straight, empty tube the track starts with
+START_STRAIGHT = 160    # segments of straight, empty tube the track starts with: room for the drone ring
 START_PATTERN = "original"   # wall pattern of the first tunnel (see conduit_patterns.txt)
 WIDE_CHANCE = 0.5       # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
@@ -81,6 +81,11 @@ BULLET_LIFE = 0.9       # seconds before a shot fizzles out
 LOCK_RANGE = 60.0       # drones up to this far ahead can be locked on to (near ones only)
 LOCK_ANGLE = 0.14       # ...if a straight shot reaches them within this angle (radians, 8 deg)
                         # of the sled's heading: the target must be roughly in front
+DRONE_SPEED = 0.5       # drones fly forward at this fraction of top speed
+RING_DRONES = 12        # the tutorial's ring of drones: this many, evenly round the tube
+                        # (closer than a sled's width apart: no way through but to shoot one)
+RING_AHEAD = 200.0      # ...this far ahead of the racer when it appears, hanging still
+                        # (and so is its ring of boost pads, as many, with no way to miss one)
 BOOST_CHANCE = 0.375    # chance that a section gets a boost pad (one at most)
 SCRAPE_DRAG = 130.0     # speed lost per second while grinding along a kerb
 SCRAPE_FLOOR = 0.5      # ...down to this fraction of top speed

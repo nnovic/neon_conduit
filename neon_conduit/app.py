@@ -118,6 +118,8 @@ class App:
                         continue
                     if self.launch_t is not None:         # nothing to do while it plays
                         continue
+                    if ev.key == pygame.K_TAB and game.state in ("brief", "play"):
+                        game.tutorial.skip()               # skip the tutorial (first race only)
                     if game.state == "brief":            # any key sets the racer off...
                         self.start(False)
                         continue                           # ...and does nothing else

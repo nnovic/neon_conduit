@@ -4,7 +4,6 @@ import os
 
 import pygame
 
-from .config import GATE_SEGS, SEG
 from .speedo import H as SPEEDO_H, W as SPEEDO_W, Speedo
 
 TEXT = (235, 240, 255)
@@ -15,6 +14,8 @@ TITLE_WIDTH = 0.86              # the title spans this much of the screen's widt
 TITLE_STOPS = ((0.0, (255, 250, 255)), (0.42, (255, 120, 220)), (0.52, (255, 40, 150)), (1.0, (255, 170, 40)))
 TITLE_STROKE = (20, 0, 40)
 TITLE_GLOW = (255, 50, 170)
+TIP_COL = (255, 255, 160)        # the tutorial's tips (see tutorial.py)...
+TIP_Y = 150                     # ...centred this far down the screen
 BAND_Y = 110                    # the title screen's dark band leaves this much clear above and below
 # The title screen's credits banner, scrolling along the bottom: a summary of CREDITS.md.
 CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (CC BY-SA 3.0, opengameart.org)     \u2022     '
@@ -22,10 +23,7 @@ CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (CC BY-SA 3.0, opengamea
 CREDITS_H = 26                  # height of the banner's strip
 CREDITS_SPEED = 70.0            # pixels per second it scrolls to the left
 CREDITS_COL = (190, 200, 230)
-BRIEF = ["Reach each gate before the clock runs out.",
-         "Follow the stars round the outside of bends, or you lose speed.",
-         "",
-         "Left / Right  steer      Up / Down  aim      Space  fire",
+BRIEF = ["Left / Right  steer      Up / Down  aim      Space  fire",
          "P  pause      F11  full screen      Esc  quit",
          "",
          "Press any key to go"]
@@ -101,16 +99,35 @@ class Hud:
     def draw(self, game):
         """Clock, score, gate, speed and progress to the next gate."""
         w = self.w
-        tcol = (255, 70, 60) if game.time_left < 6 and int(game.t * 4) % 2 else TEXT
-        self.text(self.mid, "%04.1f" % game.time_left, (w // 2, 30), tcol, center=True)
+        if game.tutorial.clock:             # hidden while the tutorial holds it back
+            tcol = (255, 70, 60) if game.time_left < 6 and int(game.t * 4) % 2 else TEXT
+            self.text(self.mid, "%04.1f" % game.time_left, (w // 2, 30), tcol, center=True)
         self.text(self.font, "SCORE %07d" % game.score, (20, 16))
         self.text(self.font, "GATE %d" % game.level, (20, 44))
         self.speedo.draw(self.screen, (w - SPEEDO_W - 8, self.h - SPEEDO_H - 8), game)
-        prog = (game.sled_z / SEG % GATE_SEGS) / GATE_SEGS
-        pygame.draw.rect(self.screen, (40, 44, 70), (w // 2 - 150, 56, 300, 8))
-        pygame.draw.rect(self.screen, (255, 255, 160), (w // 2 - 150, 56, int(300 * prog), 8))
+        if game.tutorial.clock:             # no gates to run for while the tutorial is on
+            prog = game.gate_progress
+            pygame.draw.rect(self.screen, (40, 44, 70), (w // 2 - 150, 56, 300, 8))
+            pygame.draw.rect(self.screen, (255, 255, 160), (w // 2 - 150, 56, int(300 * prog), 8))
         if game.msg[1] > 0:
             self.text(self.mid, game.msg[0], (w // 2, 120), (255, 255, 160), center=True)
+        self.tip(game)
+
+    def tip(self, game):
+        """The tutorial's tip, if one is up, under the clock; and while the tutorial runs,
+        how to skip it."""
+        if not game.tutorial.done:
+            self.text(self.font, "TAB  skip tutorial", (20, self.h - 36), (170, 180, 210))
+        up = game.tutorial.current()
+        if up is None:
+            return
+        tip, alpha = up
+        img = self.mid.render(tip.text, True, TIP_COL)
+        shadow = self.mid.render(tip.text, True, (0, 0, 0))
+        r = img.get_rect(center=(self.w // 2, TIP_Y))
+        for surf, pos in ((shadow, r.move(2, 2)), (img, r)):
+            surf.set_alpha(int(255 * alpha))
+            self.screen.blit(surf, pos)
 
     def brief(self):
         """The briefing, on a dark panel over the race while the racer waits on the start line."""
