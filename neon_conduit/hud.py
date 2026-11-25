@@ -4,6 +4,7 @@ import os
 
 import pygame
 
+from .nowplaying import NowPlaying
 from .speedo import H as SPEEDO_H, W as SPEEDO_W, Speedo
 
 TEXT = (235, 240, 255)
@@ -79,6 +80,7 @@ class Hud:
         self.big = pygame.font.Font(None, 84)
         self.mid = pygame.font.Font(None, 44)
         self.speedo = Speedo()
+        self.now_playing = NowPlaying()
         self.band = None            # the title screen's darkened band behind its tunnel
         self.title_layer = None     # the title screen's text, to fade out at launch
         self.credits_strip = None   # the credits banner's strip, and its line of text
@@ -105,6 +107,8 @@ class Hud:
         self.text(self.font, "SCORE %07d" % game.score, (20, 16))
         self.text(self.font, "GATE %d" % game.level, (20, 44))
         self.speedo.draw(self.screen, (w - SPEEDO_W - 8, self.h - SPEEDO_H - 8), game)
+        self.now_playing.draw(self.screen, (8, self.h - SPEEDO_H - 8), game.now_playing,
+                              game.t - game.music_t)
         if game.tutorial.clock:             # no gates to run for while the tutorial is on
             prog = game.gate_progress
             pygame.draw.rect(self.screen, (40, 44, 70), (w // 2 - 150, 56, 300, 8))

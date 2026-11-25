@@ -67,6 +67,8 @@ class Game:
                                 # gate passed, or where the clock started
         self.skipping = None    # seconds into skipping the tutorial, or None
         self.door_sounds = []   # (channel, sound, depth) of each door sliding open within earshot
+        self.now_playing = None # the race music's tags, as it starts (see nowplaying.read_tags)...
+        self.music_t = 0.0      # ...and the game clock then
 
     @property
     def veil(self):
@@ -147,7 +149,7 @@ class Game:
         clock, racing = self.tutorial.clock, self.tutorial.started and self.tutorial.racing
         gone = self.tutorial.update(dt, seg)
         if self.tutorial.racing and not racing:  # into the real game: on with the race music
-            self.audio.race_music()
+            self.now_playing, self.music_t = self.audio.race_music(), self.t
         if gone and gone.then:
             self._tutorial_event(gone.then, pz)
         if self.tutorial.clock and not clock:   # the clock starts: so does the run to the next gate

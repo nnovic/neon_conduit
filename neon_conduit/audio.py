@@ -9,6 +9,7 @@ import pygame
 from .config import (BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME,
                      RACE_MUSIC_DIR, RACE_MUSIC_EXTS, RACE_MUSIC_FADE, RACE_MUSIC_VOLUME, STAR_SOUND,
                      STAR_SOUND_VOLUME)
+from .nowplaying import read_tags
 
 
 class Audio:
@@ -75,26 +76,31 @@ class Audio:
 
     def music(self, path, volume=1.0, fade=0.0):
         """Loop the music file at path, fading in over fade seconds. A file that can't be
-        played is skipped: the game goes on without it."""
+        played is skipped: the game goes on without it. True if it plays."""
         if not self.ok:
-            return
+            return False
         try:
             pygame.mixer.music.load(path)
             pygame.mixer.music.set_volume(volume)
             pygame.mixer.music.play(loops=-1, fade_ms=int(fade * 1000))
         except (pygame.error, OSError) as e:
             print("No music (%s): %s" % (path, e))
+            return False
+        return True
 
     def race_music(self):
-        """Loop one music file picked at random from the race music folder. An empty or
-        missing folder means no race music."""
+        """Loop one music file picked at random from the race music folder, and return its
+        tags (see nowplaying.read_tags); None if none plays (an empty or missing folder)."""
         try:
             names = [n for n in os.listdir(RACE_MUSIC_DIR) if n.lower().endswith(RACE_MUSIC_EXTS)]
         except OSError:
             names = []
-        if names:
-            self.music(os.path.join(RACE_MUSIC_DIR, random.choice(names)),
-                       RACE_MUSIC_VOLUME, RACE_MUSIC_FADE)
+        if not names:
+            return None
+        path = os.path.join(RACE_MUSIC_DIR, random.choice(names))
+        if not self.music(path, RACE_MUSIC_VOLUME, RACE_MUSIC_FADE):
+            return None
+        return read_tags(path)
 
     def stop_music(self, fade=0.0):
         """Fade the music out over fade seconds, or stop it at once."""
@@ -109,10 +115,10 @@ class Silent:
         return None
 
     def music(self, path, volume=1.0, fade=0.0):
-        pass
+        return False
 
     def race_music(self):
-        pass
+        return None
 
     def stop_music(self, fade=0.0):
         pass
