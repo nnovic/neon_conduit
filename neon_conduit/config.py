@@ -26,10 +26,11 @@ TITLE_MUSIC = os.path.join(os.path.dirname(__file__), "assets", "Hero_Immortal.m
 TITLE_MUSIC_VOLUME = 0.6
 TITLE_MUSIC_FADE = 1.0  # seconds the title music takes to fade in
 # The race music: any one file from this folder, picked at random as the real game starts
-# (past the tutorial's door). The folder is git-ignored: whatever is in it stays local.
+# (just past the race's first door). The folder is git-ignored: whatever is in it stays local.
 RACE_MUSIC_DIR = os.path.join(os.path.dirname(__file__), "music")
 RACE_MUSIC_EXTS = (".mp3", ".ogg", ".wav", ".flac", ".opus", ".mod", ".xm", ".it", ".s3m")
 RACE_MUSIC_VOLUME = 0.6
+RACE_MUSIC_DELAY = 1.0  # seconds after the sled passes the race's first door that the race music starts
 RACE_MUSIC_FADE = 1.5   # seconds the race music takes to fade in, and out at game over
 NOW_PLAYING_FADE = 0.6  # seconds the HUD's track panel (title, artist, album) takes to fade in or out...
 NOW_PLAYING_HOLD = 8.0  # ...and stays up in between, as the race music starts

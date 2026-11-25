@@ -86,11 +86,6 @@ class Tutorial:
         return self.i >= len(self.tips)
 
     @property
-    def racing(self):
-        """True once the real game is on: through the tutorial's door, or at once without one."""
-        return not self.tips or self.seg >= DOOR_AT
-
-    @property
     def can_skip(self):
         """True while the tutorial runs and its door is not yet in view."""
         return not self.done and self.seg < SKIP_UNTIL

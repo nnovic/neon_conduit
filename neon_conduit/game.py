@@ -11,7 +11,7 @@ from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
                      DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
-                     DRONE_SPEED, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
+                     DRONE_SPEED, RACE_MUSIC_DELAY, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
 from .tutorial import COURSE, SKIP_FADE, SKIP_TO, TIPS, Tutorial
@@ -67,6 +67,7 @@ class Game:
                                 # gate passed, or where the clock started
         self.skipping = None    # seconds into skipping the tutorial, or None
         self.door_sounds = []   # (channel, sound, depth) of each door sliding open within earshot
+        self.music_at = None    # game time the race music is due (once the first door is passed)
         self.now_playing = None # the race music's tags, as it starts (see nowplaying.read_tags)...
         self.music_t = 0.0      # ...and the game clock then
 
@@ -146,10 +147,9 @@ class Game:
         self.shake = max(0.0, self.shake - dt)
         self.flash = max(0.0, self.flash - dt)
         self.msg = (self.msg[0], self.msg[1] - dt)
-        clock, racing = self.tutorial.clock, self.tutorial.started and self.tutorial.racing
+        self._race_music(pz)
+        clock = self.tutorial.clock
         gone = self.tutorial.update(dt, seg)
-        if self.tutorial.racing and not racing:  # into the real game: on with the race music
-            self.now_playing, self.music_t = self.audio.race_music(), self.t
         if gone and gone.then:
             self._tutorial_event(gone.then, pz)
         if self.tutorial.clock and not clock:   # the clock starts: so does the run to the next gate
@@ -161,6 +161,16 @@ class Game:
             self.best = max(self.best, self.score)
             self.state = "over"
             self.audio.stop_music(RACE_MUSIC_FADE)
+
+    def _race_music(self, pz):
+        """The race music starts a little after the sled passes the race's first door (the
+        tutorial's, in the first race)."""
+        if self.music_at is None:
+            if any(self.track.is_door(i) for i in range(int(self.prev_z // SEG) + 1, int(pz // SEG) + 1)):
+                self.music_at = self.t + RACE_MUSIC_DELAY
+        elif self.music_at <= self.t:
+            self.music_at = float("inf")            # once only
+            self.now_playing, self.music_t = self.audio.race_music(), self.t
 
     def _move(self, dt):
         """Speed up or slow down towards the target speed, then move along the track."""
