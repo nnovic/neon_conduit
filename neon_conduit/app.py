@@ -4,7 +4,7 @@ import argparse
 import pygame
 
 from .audio import Audio
-from .config import FOCAL, HORIZON, SCREEN, TITLE_MUSIC, TITLE_MUSIC_FADE, TITLE_MUSIC_VOLUME
+from .config import BOOST_MULT, FOCAL, HORIZON, SCREEN, TITLE_MUSIC, TITLE_MUSIC_FADE, TITLE_MUSIC_VOLUME
 from .game import Controls, Game
 from .hud import Hud
 from .render import Renderer
@@ -12,6 +12,10 @@ from .title import TitleFlag, TitleTunnel, ease
 
 LAUNCH_MOVE = 1.6               # seconds the title's tunnel takes to glide into the game's view...
 LAUNCH_FADE = 0.8               # ...and the title then takes to fade into the game
+PIXEL_SIZES = (1, 2, 3, 4, 6)   # what F9 steps through: how many screen pixels make one big
+                                # pixel of the 3D view (1: none; the HUD is never pixelated)
+BOOST_PIXEL = 5.0               # big pixels this wide at full boost speed, growing from none at
+                                # cruising speed: up as a boost kicks in, back down as it wears off
 
 
 def read_controls(keys, fire):
@@ -25,7 +29,7 @@ def read_controls(keys, fire):
 
 
 class App:
-    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False):
+    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False, pixel=1):
         pygame.init()
         pygame.display.set_caption("Neon Conduit")
         # SCALED: the game always draws at size; pygame blows it up to fill the screen in
@@ -44,6 +48,24 @@ class App:
         self.title_t = 0.0          # clock of the title screen's flag and tunnel
         self.launch_t = None        # time since ENTER on the title, while it turns into the game
         self.paused = False
+        self.pixel = max(1, pixel)  # the 3D view's big pixels, this many screen pixels wide
+
+    def boost_pixel(self):
+        """How wide the big pixels are for the racer's speed: 1 (none) at cruising speed or
+        below, BOOST_PIXEL at full boost speed, in between as the speed rises or falls."""
+        game = self.game
+        over = (game.speed / game.max_speed - 1) / (BOOST_MULT - 1)
+        return 1 + (BOOST_PIXEL - 1) * max(0.0, min(1.0, over))
+
+    def pixelate(self):
+        """Blow the frame drawn so far up from a smaller copy, nearest pixel only: big,
+        hard-edged pixels, as wide as F9 has them or the speed makes them, the wider."""
+        n = max(self.pixel, self.boost_pixel())
+        if n < 1.05:
+            return
+        w, h = self.screen.get_size()
+        small = pygame.transform.smoothscale(self.screen, (max(1, round(w / n)), max(1, round(h / n))))   # each big pixel: the average of its block
+        pygame.transform.scale(small, (w, h), self.screen)
 
     def start(self, reset=True):
         """Set the racer off; reset: on a fresh track (it already is after the briefing)."""
@@ -64,6 +86,7 @@ class App:
             self.hud.credits(self.title_t)
             return
         self.renderer.draw(game)
+        self.pixelate()
         self.hud.draw(game)
         if game.veil > 0:                   # skipping the tutorial: a fade to black and back
             veil = pygame.Surface(self.screen.get_size())
@@ -91,6 +114,7 @@ class App:
         if s > LAUNCH_MOVE:
             title = scr.copy()
             self.renderer.draw(self.game)
+            self.pixelate()
             self.hud.draw(self.game)
             title.set_alpha(int(255 * (1 - ease((s - LAUNCH_MOVE) / LAUNCH_FADE))))
             scr.blit(title, (0, 0))
@@ -119,6 +143,10 @@ class App:
                         return
                     if ev.key == pygame.K_F11:
                         self.toggle_fullscreen()
+                        continue
+                    if ev.key == pygame.K_F9:             # step through the pixel sizes
+                        k = PIXEL_SIZES.index(self.pixel) if self.pixel in PIXEL_SIZES else 0
+                        self.pixel = PIXEL_SIZES[(k + 1) % len(PIXEL_SIZES)]
                         continue
                     if self.launch_t is not None:         # nothing to do while it plays
                         continue
@@ -163,8 +191,10 @@ def main():
     ap.add_argument("--frames", type=int, help="self-play this many frames, then exit (for testing)")
     ap.add_argument("--screenshot", help="with --frames, save the last frame to this file")
     ap.add_argument("--fullscreen", action="store_true", help="start in full screen (F11 toggles it)")
+    ap.add_argument("--pixel", type=int, default=1, metavar="N",
+                    help="pixelate the 3D view: big pixels N screen pixels wide (F9 steps through sizes)")
     args = ap.parse_args()
-    app = App(args.seed, fullscreen=args.fullscreen)
+    app = App(args.seed, fullscreen=args.fullscreen, pixel=args.pixel)
     try:
         app.run(args.frames, args.screenshot)
     finally:
