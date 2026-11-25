@@ -20,26 +20,29 @@ class Tip:
 # track carries on after them.
 BEND = 48                   # segments in each bend, and in each slope
 BOOST_RUN = 134             # segments of straight between the bends and the slopes
+LAST_RUN = 100              # segments of the last straight, up to the door
 COURSE = [
     (BEND, 0.3, 0.0),       # a bend to the right, with hint stars round its outside...
     (BEND, -0.3, 0.0),      # ...then one to the left
     (BOOST_RUN, 0.0, 0.0),  # a straight, with the ring of boost pads
     (BEND, 0.0, 0.2),       # up...
     (BEND, 0.0, -0.2),      # ...and down
-    (100, 0.0, 0.0),        # a straight for the rest of the tutorial, while the clock comes in,
+    (LAST_RUN, 0.0, 0.0),   # a straight for the rest of the tutorial, while the clock comes in,
                             # ending at a door into the real game (see Track)
 ]
 BENDS_AT = START_STRAIGHT               # segment where the first bend begins
 BOOSTS_AT = BENDS_AT + 2 * BEND         # ...the straight after the bends
 SLOPES_AT = BOOSTS_AT + BOOST_RUN       # ...the slopes
-STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...and the last straight
+STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...the last straight
+DOOR_AT = STRAIGHT_AT + LAST_RUN        # ...and the door at its end
 
 # Until the tip that starts the clock, there is none: it is hidden and stands still.
 TIPS = [
-    Tip(18, "Destroy the drones before they hit you!", 3.0, then="drone_ring"),   # about 1.5 s in
-    Tip(BENDS_AT - 10, "Stars show the optimal path!", 4.0),   # going into the bends
-    Tip(BOOSTS_AT, "Boosts also make you invincible!", 3.0, then="boost_ring"),   # out of the bends
-    Tip(STRAIGHT_AT, "Do not run out of time!", 4.0, clock=True),   # past the slopes
+    Tip(18, "Destroy the drones before they hit you.", 3.0, then="drone_ring"),   # about 1.5 s in
+    Tip(BENDS_AT - 10, "Stars show the optimal path.", 4.0),   # going into the bends
+    Tip(BOOSTS_AT, "Boosts also make you invincible.", 3.0, then="boost_ring"),   # out of the bends
+    Tip(STRAIGHT_AT, "Do not run out of time.", 4.0, clock=True),   # past the slopes
+    Tip(DOOR_AT, "Good luck!", 2.5),                    # through the door, into the real game
 ]
 
 
