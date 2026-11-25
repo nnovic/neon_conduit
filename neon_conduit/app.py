@@ -1,5 +1,6 @@
 """The window, the main loop and the command line."""
 import argparse
+import time
 
 import pygame
 
@@ -29,7 +30,8 @@ def read_controls(keys, fire):
 
 
 class App:
-    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False, pixel=1):
+    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False, pixel=1,
+                 show_fps=False):
         pygame.init()
         pygame.display.set_caption("Neon Conduit")
         # SCALED: the game always draws at size; pygame blows it up to fill the screen in
@@ -49,6 +51,19 @@ class App:
         self.launch_t = None        # time since ENTER on the title, while it turns into the game
         self.paused = False
         self.pixel = max(1, pixel)  # the 3D view's big pixels, this many screen pixels wide
+        self.show_fps = show_fps    # F3: frames per second and the work each frame takes
+        self.work_ms = 0.0          # milliseconds of game update and drawing per frame, smoothed
+        self.fps_font = pygame.font.Font(None, 24)
+
+    def draw_fps(self):
+        """Top right: frames per second, and how many milliseconds of the 16.7 a frame has at
+        60 fps go to updating and drawing the game (the rest is spent waiting)."""
+        s = "%3.0f fps   %4.1f ms" % (self.clock.get_fps(), self.work_ms)
+        col = (120, 255, 160) if self.work_ms < 12 else (255, 200, 60) if self.work_ms < 16.7 else (255, 70, 60)
+        img = self.fps_font.render(s, True, col)
+        r = img.get_rect(topright=(self.screen.get_width() - 12, 12))
+        self.screen.fill((0, 0, 0), r.inflate(10, 6))
+        self.screen.blit(img, r)
 
     def boost_pixel(self):
         """How wide the big pixels are for the racer's speed: 1 (none) at cruising speed or
@@ -133,7 +148,8 @@ class App:
             self.audio.music(TITLE_MUSIC, TITLE_MUSIC_VOLUME, TITLE_MUSIC_FADE)
         count = 0
         while True:
-            dt = 1 / 60 if auto else min(0.05, self.clock.tick(60) / 1000.0)
+            ms = self.clock.tick() if auto else self.clock.tick(60)   # self-play runs flat out
+            dt = 1 / 60 if auto else min(0.05, ms / 1000.0)
             fire = False                # one shot per Space press, holding it does not auto-fire
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
@@ -143,6 +159,9 @@ class App:
                         return
                     if ev.key == pygame.K_F11:
                         self.toggle_fullscreen()
+                        continue
+                    if ev.key == pygame.K_F3:
+                        self.show_fps = not self.show_fps
                         continue
                     if ev.key == pygame.K_F9:             # step through the pixel sizes
                         k = PIXEL_SIZES.index(self.pixel) if self.pixel in PIXEL_SIZES else 0
@@ -174,9 +193,13 @@ class App:
                     self.launch_t = None
                     self.title_tunnel.yaw0 = None
                     game.state = "brief"
+            t0 = time.perf_counter()
             if game.state == "play" and not self.paused:
                 game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed(), fire))
             self.draw()
+            self.work_ms += ((time.perf_counter() - t0) * 1000 - self.work_ms) * 0.05
+            if self.show_fps:
+                self.draw_fps()
             pygame.display.flip()
             count += 1
             if frames is not None and count >= frames:
@@ -191,10 +214,11 @@ def main():
     ap.add_argument("--frames", type=int, help="self-play this many frames, then exit (for testing)")
     ap.add_argument("--screenshot", help="with --frames, save the last frame to this file")
     ap.add_argument("--fullscreen", action="store_true", help="start in full screen (F11 toggles it)")
+    ap.add_argument("--fps", action="store_true", help="show frames per second and frame time (F3 toggles it)")
     ap.add_argument("--pixel", type=int, default=1, metavar="N",
                     help="pixelate the 3D view: big pixels N screen pixels wide (F9 steps through sizes)")
     args = ap.parse_args()
-    app = App(args.seed, fullscreen=args.fullscreen, pixel=args.pixel)
+    app = App(args.seed, fullscreen=args.fullscreen, pixel=args.pixel, show_fps=args.fps)
     try:
         app.run(args.frames, args.screenshot)
     finally:
