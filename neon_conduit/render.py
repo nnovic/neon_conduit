@@ -110,14 +110,20 @@ def rainbow(hue):
 
 
 def star_fan(radius):
-    """A five-pointed star pointing ahead, stretched along the track, as a fan of triangles
-    in surface coordinates (along the track, sideways along the wall) around its centre."""
+    """A five-pointed star pointing ahead, stretched along the track, in surface coordinates
+    (along the track, sideways along the wall) around its centre: five convex kites, one per
+    point (centre, inner corner, tip, inner corner), each with its reach along the track."""
     pts = []
     for j in range(10):
         ang = j * math.pi / 5
         rr = radius if j % 2 == 0 else radius * 0.42
         pts.append((STAR_STRETCH * rr * math.cos(ang), rr * math.sin(ang)))
-    return [((0.0, 0.0), pts[j], pts[(j + 1) % 10]) for j in range(10)]
+    kites = []
+    for j in range(0, 10, 2):
+        kite = ((0.0, 0.0), pts[(j - 1) % 10], pts[j], pts[j + 1])
+        us = [u for u, _ in kite]
+        kites.append((kite, min(us), max(us)))
+    return kites
 
 
 FLOOR_EDGES = set(FLOOR_SIDES) | {s + 1 for s in FLOOR_SIDES}    # vertices on the floor
@@ -467,22 +473,41 @@ class Renderer:
         exactly what they should, no more.
         """
         lo, hi = si * SEG, (si + 1) * SEG
+        if hi - self.game.cam_z < NEAR:
+            return                                  # all of it behind the camera
+        draw, proj_xy = pygame.draw.polygon, self.proj_xy
         for k in range(int((lo - STAR_REACH) // SEG), int((hi + STAR_REACH) // SEG) + 1):
             if k < 0 or not tr.has_star(k):
                 continue
             zk, a = k * SEG, tr.line(k)
             fl = 1.0 if tr.open[k] else 0.0
+            # The slice of the star on this segment, a little past the far boundary, over
+            # the seam the surface leaves there.
+            u0, u1 = lo - zk, hi + 0.4 - zk
             tw = 0.5 + 0.5 * math.sin(self.game.t * 8 + k)               # twinkle, 0 .. 1
             for fan, h, col in ((STAR_GLOW, 0.04, mix((110, 80, 15), (170, 125, 25), tw)),
                                 (STAR_CORE, 0.08, mix((240, 200, 60), (255, 245, 170), tw))):
-                for tri in fan:
-                    # A little past the far boundary, over the seam the surface leaves there.
-                    piece = clip(clip(tri, lo - zk, False), hi + 0.4 - zk, True)
+                seen = {}                           # surface point -> screen point, this slice
+                for kite, ku0, ku1 in fan:
+                    if ku1 <= u0 or ku0 >= u1:
+                        continue                    # none of this point on the slice
+                    piece = kite
+                    if ku0 < u0:
+                        piece = clip(piece, u0, False)
+                    if ku1 > u1:
+                        piece = clip(piece, u1, True)
                     if len(piece) < 3:
                         continue
-                    pts = [self.proj(zk + u, a, v, h, False, fl) for u, v in piece]
-                    if all(pts):
-                        pygame.draw.polygon(self.screen, col, [p[:2] for p in pts])
+                    pts = []
+                    for uv in piece:
+                        p = seen.get(uv)
+                        if p is None:
+                            p = seen[uv] = proj_xy(zk + uv[0], *wall_xy(a, uv[1], h, False, fl))
+                        if p is None:
+                            break
+                        pts.append(p[:2])
+                    else:
+                        draw(self.screen, col, pts)
 
     def _inside_begin(self, frame):
         """Start painting on the layer for the inside of the tube beyond a door at frame:
