@@ -57,7 +57,6 @@ python3 play.py
 | `--frames N` | Let the auto-pilot play N frames, then quit (for testing) |
 | `--screenshot FILE` | With `--frames`, save the last frame as an image |
 | `--fps` | Show frames per second and frame time (F3 switches it on and off) |
-| `--pixel N` | Pixelate the 3D view in big pixels N screen pixels wide (F9 steps through sizes) |
 
 ## How to play
 
@@ -69,7 +68,6 @@ python3 play.py
 | P | Pause |
 | F11 | Full screen on / off |
 | F3 | Frames per second and frame time on / off |
-| F9 | Pixelate the 3D view: off, then bigger and bigger pixels |
 | Enter | Start / race again |
 | Esc | Quit |
 
