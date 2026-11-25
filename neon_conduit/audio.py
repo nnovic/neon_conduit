@@ -5,7 +5,7 @@ from array import array
 
 import pygame
 
-from .config import STAR_SOUND, STAR_SOUND_VOLUME
+from .config import BOOST_SOUND, BOOST_SOUND_VOLUME, STAR_SOUND, STAR_SOUND_VOLUME
 
 
 class Audio:
@@ -18,7 +18,8 @@ class Audio:
             pygame.mixer.init(self.RATE, -16, 1, 512)
             self.sounds = {
                 "shot": self._sweep(900, 300, 0.09, 0.25),
-                "boost": self._sweep(200, 900, 0.35, 0.3),
+                "boost": self._file(BOOST_SOUND, BOOST_SOUND_VOLUME)
+                         or self._sweep(200, 900, 0.35, 0.3),
                 "hit": self._noise(0.3, 0.45),
                 "boom": self._noise(0.22, 0.3),
                 "gate": self._sweep(500, 1300, 0.45, 0.3),

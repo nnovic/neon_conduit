@@ -27,6 +27,8 @@ TITLE_MUSIC_VOLUME = 0.6
 TITLE_MUSIC_FADE = 1.0  # seconds the title music takes to fade in
 STAR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "completetask_0.wav")   # see CREDITS.md
 STAR_SOUND_VOLUME = 0.5
+BOOST_SOUND = os.path.join(os.path.dirname(__file__), "assets", "Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav")   # see CREDITS.md
+BOOST_SOUND_VOLUME = 0.6
 
 # ----------------------------------------------------------------- camera
 PLAYER_D = 12.0         # how far ahead of the camera the sled sits

@@ -23,6 +23,13 @@ project's own code.
   [OGA-BY 3.0](https://opengameart.org/content/oga-by-30-faq); used here under CC0.
   Converted from the original `completetask_0.mp3` to WAV; the sound itself is unchanged.
 
+**"Energy BuildUp to LOOP_Med_Start_var 1"**, from **"JC Sounds Sci-Fi Pack Vol 1"** by **JC Sounds** (2025)
+- Played when a boost pad is hit
+- File: [`neon_conduit/assets/Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav`](<neon_conduit/assets/Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav>)
+- Source: [opengameart.org/content/jc-sounds-sci-fi-pack-vol-1](https://opengameart.org/content/jc-sounds-sci-fi-pack-vol-1)
+- License: [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+  The file is used unmodified.
+
 ## Font
 
 **Russo One** by **Jovanny Lemonad** (jovanny.ru), 2011–2012, with Reserved Font Name "Russo"
