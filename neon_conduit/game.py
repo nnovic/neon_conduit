@@ -161,6 +161,7 @@ class Game:
             self.best = max(self.best, self.score)
             self.state = "over"
             self.audio.stop_music(RACE_MUSIC_FADE)
+            self.now_playing = None             # the music is gone: so is its panel
 
     def _race_music(self, pz):
         """The race music starts a little after the sled passes the race's first door (the

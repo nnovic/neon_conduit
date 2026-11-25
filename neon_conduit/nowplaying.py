@@ -1,5 +1,5 @@
 """The race music's tags (title, artist, album, date), and the HUD panel that shows them as
-a track starts: bottom left, the speedometer's mirror image.
+a track starts, and every minute or so after: bottom left, the speedometer's mirror image.
 
 Tags are read here rather than with a library, so the game needs nothing but pygame: ID3v2
 and ID3v1 (MP3), and Vorbis comments (FLAC, Ogg Vorbis, Opus). Anything else, or a file
@@ -10,8 +10,8 @@ import struct
 
 import pygame
 
-from .config import NOW_PLAYING_FADE, NOW_PLAYING_HOLD
-from .speedo import H, SLANT, W, lean
+from .config import NOW_PLAYING_EVERY, NOW_PLAYING_FADE, NOW_PLAYING_HOLD
+from .speedo import FRAME, H, SLANT, W, lean
 
 TITLE_FONT = os.path.join(os.path.dirname(__file__), "assets", "RussoOne-Regular.ttf")
 BG = (8, 10, 24, 170)
@@ -167,12 +167,14 @@ def _ogg(data):
 
 
 # ------------------------------------------------------------------ panel
-def _fit(font, s, width, col):
-    """s rendered in font, cut short with an ellipsis to fit in width."""
-    if font.size(s)[0] > width:
-        while s and font.size(s + "…")[0] > width:
+def _fit(font, s, width, col, form="%s"):
+    """s set in form (e.g. in quotes) and rendered in font, s cut short with an ellipsis so
+    that it all fits in width."""
+    if font.size(form % s)[0] > width:
+        while s and font.size(form % (s + "…"))[0] > width:
             s = s[:-1]
         s = s.rstrip() + "…"
+    s = form % s
     return font.render(s, True, col), font.render(s, True, (0, 0, 0))
 
 
@@ -190,33 +192,40 @@ class NowPlaying:
                            [(2, 2), (W - 86, 2), (W - 74, 0), (W - 30, 0), (W - 30, H - 2),
                             (12, H - 2), (0, H - 12)]])
         self.tags = None
-        self.surf = None
+        self.plain = None           # the panel for self.tags...
+        self.framed = None          # ...and the same in the speedometer's orange frame
 
     def _build(self, tags):
         s = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.draw.polygon(s, BG, self.frame)          # no border: unlike the speedometer's
+        pygame.draw.polygon(s, BG, self.frame)
         album = "  •  ".join(v for v in (tags["album"], tags["date"]) if v)
-        for font, text, col, y in ((self.big, tags["title"], TITLE_COL, 7),
-                                   (self.mid, tags["artist"], ARTIST_COL, 40),
-                                   (self.small, album, ALBUM_COL, 62)):
+        for font, text, col, y, form in ((self.big, tags["title"], TITLE_COL, 7, "“%s”"),
+                                         (self.mid, tags["artist"], ARTIST_COL, 40, "%s"),
+                                         (self.small, album, ALBUM_COL, 62, "%s")):
             if not text:
                 continue
             x = PAD + (H - y - font.get_height() / 2) * SLANT   # each line set in along the slant
-            img, shadow = _fit(font, text, RIGHT - x, col)
+            img, shadow = _fit(font, text, RIGHT - x, col, form)
             s.blit(shadow, (x + 2, y + 2))
             s.blit(img, (x, y))
         return s
 
     def draw(self, screen, pos, tags, age):
         """The panel for tags at pos, age seconds after its track started: it fades in, stays
-        a while and fades out."""
+        a while and fades out; and comes back every NOW_PLAYING_EVERY seconds. Only the first
+        time is it framed in orange, like the speedometer: after that it has no border."""
         if tags is None:
             return
         fade, hold = NOW_PLAYING_FADE, NOW_PLAYING_HOLD
+        first = age < NOW_PLAYING_EVERY
+        age %= NOW_PLAYING_EVERY
         if age >= 2 * fade + hold:
             return
         if tags is not self.tags:
-            self.tags, self.surf = tags, self._build(tags)
+            self.tags, self.plain = tags, self._build(tags)
+            self.framed = self.plain.copy()
+            pygame.draw.lines(self.framed, FRAME, True, self.frame, 2)
+        surf = self.framed if first else self.plain
         alpha = min(1.0, age / fade, (2 * fade + hold - age) / fade)
-        self.surf.set_alpha(int(255 * max(0.0, alpha)))
-        screen.blit(self.surf, pos)
+        surf.set_alpha(int(255 * max(0.0, alpha)))
+        screen.blit(surf, pos)
