@@ -65,6 +65,10 @@ class App:
             return
         self.renderer.draw(game)
         self.hud.draw(game)
+        if game.veil > 0:                   # skipping the tutorial: a fade to black and back
+            veil = pygame.Surface(self.screen.get_size())
+            veil.set_alpha(int(255 * game.veil))
+            self.screen.blit(veil, (0, 0))
         if game.state == "brief":
             self.hud.brief()
             return
@@ -118,8 +122,8 @@ class App:
                         continue
                     if self.launch_t is not None:         # nothing to do while it plays
                         continue
-                    if ev.key == pygame.K_TAB and game.state in ("brief", "play") and game.tutorial.can_skip:
-                        game.tutorial.skip()               # skip the tutorial (first race, until its door)
+                    if ev.key == pygame.K_TAB and game.state in ("brief", "play"):
+                        game.skip_tutorial()               # skip the tutorial (first race, until its door)
                     if game.state == "brief":            # any key sets the racer off...
                         self.start(False)
                         continue                           # ...and does nothing else

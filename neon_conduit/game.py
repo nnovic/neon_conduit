@@ -14,7 +14,7 @@ from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOS
                      DRONE_SPEED, RING_AHEAD, RING_DRONES)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
-from .tutorial import COURSE, TIPS, Tutorial
+from .tutorial import COURSE, SKIP_FADE, SKIP_TO, TIPS, Tutorial
 
 # steer: -1 .. 1, fire: bool, aim: -1 (lowered) .. 0 (along the slope) .. 1 (raised)
 Controls = namedtuple("Controls", "steer fire aim", defaults=(0,))
@@ -65,6 +65,34 @@ class Game:
         self.scrape_cd = 0.0
         self.gate_from = 0.0    # depth from which the run to the next gate counts: the last
                                 # gate passed, or where the clock started
+        self.skipping = None    # seconds into skipping the tutorial, or None
+
+    @property
+    def veil(self):
+        """How dark the screen is while skipping the tutorial: 0 .. 1 (black) .. 0."""
+        if self.skipping is None:
+            return 0.0
+        return max(0.0, 1.0 - abs(self.skipping - SKIP_FADE) / SKIP_FADE)
+
+    @property
+    def can_skip(self):
+        """True while the tutorial can be skipped (and is not being skipped already)."""
+        return self.tutorial.can_skip and self.skipping is None
+
+    def skip_tutorial(self):
+        """Skip the tutorial, if it still can be: the screen fades to black, the racer
+        jumps to just short of its door, and the screen fades back in."""
+        if self.can_skip:
+            self.skipping = 0.0
+
+    def _skip_jump(self):
+        """The jump under the black: on to the tutorial's last straight, centred, at speed."""
+        self.tutorial.skip()
+        self.cam_z = SKIP_TO * SEG - PLAYER_D
+        self.prev_z = self.gate_from = self.sled_z
+        self.theta = self.omega = self.roll = self.dive = self.flat = self.off_line = 0.0
+        self.speed = max(self.speed, self.max_speed)
+        self.bullets, self.effects, self.sparks, self.lock = [], [], [], None
 
     @property
     def gate_progress(self):
@@ -91,6 +119,13 @@ class Game:
     # -------------------------------------------------------------- update
     def update(self, dt, controls):
         self.t += dt
+        if self.skipping is not None:
+            jump = self.skipping < SKIP_FADE <= self.skipping + dt
+            self.skipping += dt
+            if jump:
+                self._skip_jump()
+            if self.skipping >= 2 * SKIP_FADE:
+                self.skipping = None
         self.steer = controls.steer
 
         self._move(dt)

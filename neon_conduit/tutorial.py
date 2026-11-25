@@ -36,6 +36,8 @@ SLOPES_AT = BOOSTS_AT + BOOST_RUN       # ...the slopes
 STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...the last straight
 DOOR_AT = STRAIGHT_AT + LAST_RUN        # ...and the door at its end
 SKIP_UNTIL = DOOR_AT - DRAW             # the tutorial can be skipped until the door comes into view
+SKIP_TO = DOOR_AT - 35                  # skipping it takes the racer here, just short of the door...
+SKIP_FADE = 0.35                        # ...under a fade to black and back, this many seconds each way
 
 # Until the tip that starts the clock, there is none: it is hidden and stands still.
 TIPS = [
@@ -89,8 +91,10 @@ class Tutorial:
         return not self.done and self.seg < SKIP_UNTIL
 
     def skip(self):
-        """Drop the tip up, and every one still to come."""
-        self.i, self.t = len(self.tips), None
+        """Drop the tip up and every one still to come, but for those at the door; and
+        start the clock."""
+        self.i = next((k for k, tip in enumerate(self.tips) if tip.at >= DOOR_AT), len(self.tips))
+        self.t = None
         self.clock = True
 
     def current(self):
