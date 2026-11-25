@@ -1,11 +1,13 @@
 """Sound effects, mostly synthesized at start-up, and the music, streamed from assets/."""
 import math
+import os
 import random
 from array import array
 
 import pygame
 
-from .config import (BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME, STAR_SOUND,
+from .config import (BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME,
+                     RACE_MUSIC_DIR, RACE_MUSIC_EXTS, RACE_MUSIC_FADE, RACE_MUSIC_VOLUME, STAR_SOUND,
                      STAR_SOUND_VOLUME)
 
 
@@ -83,6 +85,17 @@ class Audio:
         except (pygame.error, OSError) as e:
             print("No music (%s): %s" % (path, e))
 
+    def race_music(self):
+        """Loop one music file picked at random from the race music folder. An empty or
+        missing folder means no race music."""
+        try:
+            names = [n for n in os.listdir(RACE_MUSIC_DIR) if n.lower().endswith(RACE_MUSIC_EXTS)]
+        except OSError:
+            names = []
+        if names:
+            self.music(os.path.join(RACE_MUSIC_DIR, random.choice(names)),
+                       RACE_MUSIC_VOLUME, RACE_MUSIC_FADE)
+
     def stop_music(self, fade=0.0):
         """Fade the music out over fade seconds, or stop it at once."""
         if self.ok:
@@ -96,6 +109,9 @@ class Silent:
         return None
 
     def music(self, path, volume=1.0, fade=0.0):
+        pass
+
+    def race_music(self):
         pass
 
     def stop_music(self, fade=0.0):

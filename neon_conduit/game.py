@@ -11,7 +11,7 @@ from .audio import Silent
 from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
                      DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
-                     DRONE_SPEED, RING_AHEAD, RING_DRONES)
+                     DRONE_SPEED, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
 from .geometry import bank, floor_limit, inside, lat_dist, wall_xy, wrap
 from .track import Track
 from .tutorial import COURSE, SKIP_FADE, SKIP_TO, TIPS, Tutorial
@@ -144,8 +144,10 @@ class Game:
         self.shake = max(0.0, self.shake - dt)
         self.flash = max(0.0, self.flash - dt)
         self.msg = (self.msg[0], self.msg[1] - dt)
-        clock = self.tutorial.clock
+        clock, racing = self.tutorial.clock, self.tutorial.started and self.tutorial.racing
         gone = self.tutorial.update(dt, seg)
+        if self.tutorial.racing and not racing:  # into the real game: on with the race music
+            self.audio.race_music()
         if gone and gone.then:
             self._tutorial_event(gone.then, pz)
         if self.tutorial.clock and not clock:   # the clock starts: so does the run to the next gate
@@ -156,6 +158,7 @@ class Game:
             self.time_left = 0.0
             self.best = max(self.best, self.score)
             self.state = "over"
+            self.audio.stop_music(RACE_MUSIC_FADE)
 
     def _move(self, dt):
         """Speed up or slow down towards the target speed, then move along the track."""

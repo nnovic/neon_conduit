@@ -25,6 +25,12 @@ PATTERNS_FILE = os.path.join(os.path.dirname(__file__), "conduit_patterns.txt") 
 TITLE_MUSIC = os.path.join(os.path.dirname(__file__), "assets", "Hero_Immortal.mp3")   # see CREDITS.md
 TITLE_MUSIC_VOLUME = 0.6
 TITLE_MUSIC_FADE = 1.0  # seconds the title music takes to fade in
+# The race music: any one file from this folder, picked at random as the real game starts
+# (past the tutorial's door). The folder is git-ignored: whatever is in it stays local.
+RACE_MUSIC_DIR = os.path.join(os.path.dirname(__file__), "music")
+RACE_MUSIC_EXTS = (".mp3", ".ogg", ".wav", ".flac", ".opus", ".mod", ".xm", ".it", ".s3m")
+RACE_MUSIC_VOLUME = 0.6
+RACE_MUSIC_FADE = 1.5   # seconds the race music takes to fade in, and out at game over
 STAR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "completetask_0.wav")   # see CREDITS.md
 STAR_SOUND_VOLUME = 0.5
 BOOST_SOUND = os.path.join(os.path.dirname(__file__), "assets", "Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav")   # see CREDITS.md

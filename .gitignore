@@ -2,3 +2,5 @@ __pycache__/
 .venv/
 *.pyc
 promo/*.mp4
+# Race music: local files only, not licensed for distribution (see Audio.race_music)
+neon_conduit/music/*
