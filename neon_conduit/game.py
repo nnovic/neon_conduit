@@ -8,7 +8,7 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
+from .config import (BASE_SPEED, BOOST_CHAIN, BOOST_CHAIN_EASE, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
                      DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
                      DRONE_SPEED, RACE_MUSIC_DELAY, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
@@ -42,6 +42,8 @@ class Game:
         self.roll = 0.0         # camera position angle, follows theta
         self.speed = 0.0
         self.boost = 0.0
+        self.chain = 0          # boost pads hit one after the other, each before the last wore off
+        self.chain_k = 0.0      # how much of the boost's view effects that chain earns, eased
         self.invincible = 0.0   # seconds left during which drones can't hurt the sled
         self.time_left = START_TIME
         self.level = 0
@@ -115,6 +117,24 @@ class Game:
         return max(0.0, min(1.0, over))
 
     @property
+    def view_rush(self):
+        """How strongly the view widens and bends: rush, as much of it as the chain of
+        boosts earns (see BOOST_CHAIN): barely for one pad, fully for a chain of them."""
+        return self.rush * self.chain_k
+
+    def _chain(self, dt):
+        """Ease chain_k towards what the chain earns. Once the boost has worn off, the chain
+        is over; chain_k is kept while the speed falls back, so the view eases out with it."""
+        if self.boost <= 0:
+            self.chain = 0
+        if self.chain:
+            want = BOOST_CHAIN[min(self.chain, len(BOOST_CHAIN)) - 1]
+        else:
+            want = self.chain_k if self.rush > 0 else 0.0
+        step = dt / BOOST_CHAIN_EASE
+        self.chain_k += max(-step, min(step, want - self.chain_k))
+
+    @property
     def max_speed(self):
         return min(SPEED_CAP, BASE_SPEED + 4.0 * self.level)
 
@@ -184,6 +204,7 @@ class Game:
         """Speed up or slow down towards the target speed, then move along the track."""
         tr = self.track
         self.boost = max(0.0, self.boost - dt)
+        self._chain(dt)
         self.invincible = max(0.0, self.invincible - dt)
         target = self.max_speed * (BOOST_MULT if self.boost > 0 else 1.0)
         target *= 1.0 - LINE_SLOW * self.off_line
@@ -430,6 +451,7 @@ class Game:
             elif kind == "boost":
                 if z <= pz <= z + 10 and lat_dist(o["a"], self.theta, flat) < BOOST_HW + 1.0:
                     if self.boost < BOOST_TIME - 0.6:       # not while still on the same pad
+                        self.chain = self.chain + 1 if self.boost > 0 else 1
                         self.audio.play("boost")
                         self.score += 100
                         # The exhaust bursts: an explosion ring that rides along on the nozzle.

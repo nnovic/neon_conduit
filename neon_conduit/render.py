@@ -238,8 +238,8 @@ class Renderer:
             ox_s = random.uniform(-1, 1) * 22 * game.shake
             oy_s = random.uniform(-1, 1) * 22 * game.shake
         self.pcx, self.pcy = self.cx + ox_s, self.cy + oy_s
-        self.f = self.focal * (1 + (BOOST_FOCAL - 1) * game.rush)   # wider the faster...
-        self.warp = BOOST_WARP * game.rush                          # ...and bent the more
+        self.f = self.focal * (1 + (BOOST_FOCAL - 1) * game.view_rush)   # wider the faster...
+        self.warp = BOOST_WARP * game.view_rush                          # ...and bent the more
 
     def scale(self, d):
         """Screen pixels per world unit at depth d: f / d, bent by the boost's warp (see

@@ -119,6 +119,11 @@ BOOST_FOCAL = 0.8       # the camera's focal length at full boost speed, times i
                         # wider view, the tube rushing past; eased in and out with the speed...
 BOOST_WARP = 0.5        # ...and the perspective bent, as much more at full boost: sizes fall
                         # off as 1 / depth ** (1 + this), the sled's depth keeping its size, so
-                        # near walls swell and the far tube is squeezed towards the middle
+                        # near walls swell and the far tube is squeezed towards the middle.
+# Both at full strength only for a chain of boosts (pads hit one after the other, each
+# before the last has worn off): this much of it for the 1st pad of a chain, the 2nd, the
+# 3rd and on. Eased from one to the next over BOOST_CHAIN_EASE seconds.
+BOOST_CHAIN = (0.15, 0.55, 1.0)
+BOOST_CHAIN_EASE = 0.6
 CRASH_KEEP = 0.2        # fraction of speed kept after hitting a drone
 INVINCIBLE_TIME = BOOST_TIME   # seconds a boost pad also makes the sled ram through drones unharmed
