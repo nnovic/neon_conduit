@@ -40,6 +40,7 @@ WALL_H = 2.2            # height of the upright kerbs lining open sections
 WALL_T = WALL_H         # ...and their thickness
 OPEN_CHANCE = 0.12      # chance that the next stretch of track is an open run
 OPEN_RUN = (2, 4)       # sections chained into one open run
+TUNNEL_MIN = 100        # segments of tube at least between two open runs (about 4 s at cruising speed)
 WIDE_CHANCE = 0.5       # chance that an open run widens out
 WIDE_HW = (13.0, 18.0)  # floor half-width of a widened run
 WIDE_TAPER = 20         # segments over which the kerbs splay out and back in

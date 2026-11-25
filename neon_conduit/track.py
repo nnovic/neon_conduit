@@ -4,7 +4,7 @@ import random
 
 from .config import (AIR_CHANCE, BOOST_CHANCE, BOOST_HW, FLOOR_HW, FLOOR_Y, GATE_SEGS, LINE_BEND, LINE_GAIN,
                      LINE_MAX, OPEN_CHANCE, OPEN_RUN, SEG, SLED_HW, STAR_BEND, STAR_EVERY, STAR_REACH,
-                     WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
+                     TUNNEL_MIN, WIDE_CHANCE, WIDE_HW, WIDE_TAPER)
 from .geometry import floor_limit, lat_pos, snap
 from .palette import kerb_cols
 from .patterns import PATTERNS
@@ -33,14 +33,15 @@ class Track:
         self.tube_styles = {}
         self.no_star = set()       # segments whose star would overlap a boost pad
         self.runs = 0
+        self.tube_start = 0        # where the current stretch of tube began
         self.next_gate = GATE_SEGS
         self._section(30, 0.0, 0.0, False, 0, empty=True)
 
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""
         while len(self.curv) < seg_index:
-            # Never two outdoor runs back to back: there is always tube in between.
-            if not self.outdoor(-1) and self.rng.random() < OPEN_CHANCE:
+            # Never two outdoor runs close together: at least TUNNEL_MIN segments of tube between.
+            if len(self.curv) - self.tube_start >= TUNNEL_MIN and self.rng.random() < OPEN_CHANCE:
                 self._open_run(level)
             else:
                 self._section(*self._shape(level), False, level)
@@ -144,6 +145,7 @@ class Track:
             else:
                 self._section(n, c, p, True, level, widths=widths[j:j + n])
             j += n
+        self.tube_start = len(self.curv)
 
     def _section(self, n, c, p, is_open, level, empty=False, widths=None, air=False):
         """n segments easing into and out of curvature c and pitch p, with boosts and drones."""
