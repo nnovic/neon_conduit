@@ -35,9 +35,9 @@ STRAIGHT_AT = SLOPES_AT + 2 * BEND      # ...and the last straight
 
 # Until the tip that starts the clock, there is none: it is hidden and stands still.
 TIPS = [
-    Tip(18, "Destroy drones before they hit you!", 3.0, then="drone_ring"),   # about 1.5 s in
-    Tip(BENDS_AT - 10, "Stars show the optimal path", 4.0),   # going into the bends
-    Tip(BOOSTS_AT, "Boosts also make you invincible", 3.0, then="boost_ring"),   # out of the bends
+    Tip(18, "Destroy the drones before they hit you!", 3.0, then="drone_ring"),   # about 1.5 s in
+    Tip(BENDS_AT - 10, "Stars show the optimal path!", 4.0),   # going into the bends
+    Tip(BOOSTS_AT, "Boosts also make you invincible!", 3.0, then="boost_ring"),   # out of the bends
     Tip(STRAIGHT_AT, "Do not run out of time!", 4.0, clock=True),   # past the slopes
 ]
 
