@@ -8,16 +8,14 @@ from array import array
 import pygame
 
 from .config import (BOOST_MULT, BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME,
-                     ENGINE_FADE, ENGINE_IDLE_HZ, ENGINE_IDLE_VOLUME, ENGINE_LEAD, ENGINE_RING,
-                     ENGINE_TOP_HZ, ENGINE_VOLUME, RACE_MUSIC_DIR, RACE_MUSIC_EXTS, RACE_MUSIC_FADE, RACE_MUSIC_VOLUME, STAR_SOUND,
+                     ENGINE_BUZZ, ENGINE_FADE, ENGINE_IDLE_HZ, ENGINE_IDLE_VOLUME, ENGINE_LEAD, ENGINE_RING, ENGINE_SHIMMER,
+                     ENGINE_THROB, ENGINE_TOP_HZ, ENGINE_VOLUME, RACE_MUSIC_DIR, RACE_MUSIC_EXTS, RACE_MUSIC_FADE, RACE_MUSIC_VOLUME, STAR_SOUND,
                      SPEED_CAP, STAR_SOUND_VOLUME)
 from .nowplaying import read_tags
 
 ENGINE_TOP_SPEED = SPEED_CAP * BOOST_MULT   # the speed at which the engine is at its highest
 ENGINE_TABLE = 1024         # samples in the engine's one-cycle waveform
 ENGINE_HARMONICS = 12       # overtones in it: a buzzy hum that small speakers still carry
-ENGINE_DETUNE = 1.007       # a second voice this much higher: a slow shimmer, the beat of the two
-ENGINE_CHUG = 0.3           # how deep the throb at half the pitch is (0: a steady drone)
 NOISE_GRAIN = 3675.0        # times a second the noise bursts jump to a new random level: lower
                             # sounds coarser and crunchier
 
@@ -123,9 +121,10 @@ class Audio:
 
     def _engine_wave(self):
         """One cycle of the engine's hum, -1 .. 1: a fundamental and its overtones, each
-        fainter than the last (between a sawtooth's brightness and a sine's softness)."""
-        n = ENGINE_TABLE
-        wave = [sum(math.sin(2 * math.pi * k * i / n) / k ** 1.3 for k in range(1, ENGINE_HARMONICS + 1))
+        fainter than the last; ENGINE_BUZZ sets how fast they fade, from a near sine (0) to a
+        sawtooth's brightness (1). Made again when ENGINE_BUZZ changes (tools/engine_sound.py)."""
+        n, fall = ENGINE_TABLE, 3.0 - 2.0 * ENGINE_BUZZ   # the k-th overtone is 1 / k**fall as loud
+        wave = [sum(math.sin(2 * math.pi * k * i / n) / k ** fall for k in range(1, ENGINE_HARMONICS + 1))
                 for i in range(n)]
         top = max(abs(v) for v in wave)
         return [v / top for v in wave]
@@ -169,14 +168,15 @@ class Audio:
         v1 = max(v0 - step, min(v0 + step, vol))
         f0 = self.engine_f
         wave, size = self.engine_wave, ENGINE_TABLE
+        detune, chug = 1.0 + ENGINE_SHIMMER / 100.0, ENGINE_THROB
         p1, p2 = self.engine_phase           # in cycles; p1 runs over two, for the throb
         buf = array("h", bytes(2 * n))
         for i in range(n):
             t = i / n
             fi = f0 + (f - f0) * t
             p1 = (p1 + fi / rate) % 2.0
-            p2 = (p2 + fi * ENGINE_DETUNE / rate) % 1.0
-            throb = 1.0 - ENGINE_CHUG * (0.5 + 0.5 * wave[int(p1 * 0.5 * size)])
+            p2 = (p2 + fi * detune / rate) % 1.0
+            throb = 1.0 - chug * (0.5 + 0.5 * wave[int(p1 * 0.5 * size)])
             s = (wave[int(p1 * size) % size] + wave[int(p2 * size)]) * 0.5 * throb
             buf[i] = int(32767 * (v0 + (v1 - v0) * t) * s)
         self.engine_f, self.engine_vol, self.engine_phase = f, v1, [p1, p2]

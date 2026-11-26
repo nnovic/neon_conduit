@@ -43,10 +43,15 @@ DOOR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "rock_metal_slide
 DOOR_SOUND_VOLUME = 1.0   # the recording itself is quiet (peaks near -14 dBFS)
 # The sled's engine: a synthesized hum whose pitch follows the speed, from a low idle while
 # standing still up to its highest at full boost on top cruising speed (SPEED_CAP x BOOST_MULT).
-ENGINE_IDLE_HZ = 42.0   # its pitch at a standstill, in Hz...
-ENGINE_TOP_HZ = 200.0   # ...and at full speed, rising evenly in musical steps in between
-ENGINE_VOLUME = 0.22    # its loudness at full speed, 0 .. 1...
-ENGINE_IDLE_VOLUME = 0.12   # ...and at a standstill
+ENGINE_IDLE_HZ = 73.106   # its pitch at a standstill, in Hz...
+ENGINE_TOP_HZ = 257.617   # ...and at full speed, rising evenly in musical steps in between
+ENGINE_VOLUME = 0.6    # its loudness at full speed, 0 .. 1...
+ENGINE_IDLE_VOLUME = 0.425   # ...and at a standstill
+ENGINE_BUZZ = 0.8      # its tone, 0 .. 1: 0 a soft, round hum, 1 a harsh buzz (more overtones)
+ENGINE_SHIMMER = 3.0    # a second voice this many percent higher: the two beat, a slow shimmer
+                        # (0: one plain voice)
+ENGINE_THROB = 0.502      # how deep it pulses, at half its pitch, 0 .. 1 (0: a steady drone)
+# Those can be tuned by ear with tools/engine_sound.py, which writes them back here.
 ENGINE_FADE = 0.4       # seconds it takes to fade in (at the start line) and out (pause, game over)
 ENGINE_LEAD = 0.12      # seconds of engine sound made ahead of what is playing: a slow frame
                         # shorter than this goes unheard; a pitch change is heard this late
