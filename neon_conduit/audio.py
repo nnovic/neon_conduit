@@ -22,6 +22,14 @@ NOISE_GRAIN = 3675.0        # times a second the noise bursts jump to a new rand
                             # sounds coarser and crunchier
 
 
+def engine_tone(speed):
+    """The engine's pitch (Hz) and loudness (0 .. 1) at this speed: rising evenly in musical
+    steps from idle at a standstill to their highest at ENGINE_TOP_SPEED."""
+    k = max(0.0, min(1.0, speed / ENGINE_TOP_SPEED))
+    return (ENGINE_IDLE_HZ * (ENGINE_TOP_HZ / ENGINE_IDLE_HZ) ** k,
+            ENGINE_IDLE_VOLUME + (ENGINE_VOLUME - ENGINE_IDLE_VOLUME) * k)
+
+
 class Audio:
     RATE = 22050                # the mixer format asked for: 16-bit mono at this rate
 
@@ -132,9 +140,7 @@ class Audio:
                 return                       # silent already
             f, vol = self.engine_f, 0.0
         else:
-            k = max(0.0, min(1.0, speed / ENGINE_TOP_SPEED))
-            f = ENGINE_IDLE_HZ * (ENGINE_TOP_HZ / ENGINE_IDLE_HZ) ** k
-            vol = ENGINE_IDLE_VOLUME + (ENGINE_VOLUME - ENGINE_IDLE_VOLUME) * k
+            f, vol = engine_tone(speed)
             self.engine_quiet = None         # back on before it stopped: it plays on
         if self.engine_t0 is None:          # starting: a silent loop, then sound ahead of it
             self.engine_buf[:] = array("h", bytes(len(self.engine_buf) * 2))
