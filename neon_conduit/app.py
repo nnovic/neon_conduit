@@ -13,8 +13,10 @@ from .title import TitleFlag, TitleTunnel, ease
 
 LAUNCH_MOVE = 1.6               # seconds the title's tunnel takes to glide into the game's view...
 LAUNCH_FADE = 0.8               # ...and the title then takes to fade into the game
-# The title menu's game modes: name and what it is.
-MODES = (("VOYAGE", "An endless track, new every race: reach each gate before the clock runs out"),)
+# The title menu's game modes: name, what it is, and whether it can be played yet
+# (a mode not ready is shown greyed out and Enter does nothing on it).
+MODES = (("CHALLENGE", "Coming soon", False),
+         ("VOYAGE", "An endless track, new every race: reach each gate before the clock runs out", True))
 
 
 def read_controls(keys, fire):
@@ -159,7 +161,9 @@ class App:
                     if ev.key == pygame.K_SPACE:
                         fire = True
                     if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and game.state != "play":
-                        if game.state == "title":         # off to the start line (Voyage, the only mode yet)
+                        if game.state == "title" and not MODES[self.mode][2]:
+                            continue                       # a mode not ready yet: nothing to start
+                        if game.state == "title":         # off to the start line (Voyage, the only playable mode yet)
                             game.reset()
                             self.launch_t = 0.0
                             self.title_tunnel.depart(self.title_t)

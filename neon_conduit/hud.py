@@ -28,6 +28,7 @@ MENU_H = 100                    # height of the title menu, just above the credi
 MENU_GAP = 60                   # pixels between two modes' names
 MENU_DIM = (150, 160, 200)      # modes not selected, and the keys' hint
 MENU_DESC = (255, 220, 150)     # the selected mode's description
+MENU_OFF = (75, 78, 95)         # a mode not playable yet: its name and its frame
 BRIEF = ["Left / Right  steer      Up / Down  aim      Space  fire",
          "P  pause      F11  full screen      Esc  quit",
          "",
@@ -179,18 +180,23 @@ class Hud:
         layer = pygame.Surface((self.w, MENU_H), pygame.SRCALPHA)
         screen, self.screen = self.screen, layer
         y = 26
-        imgs = [name_font.render(name, True, TEXT) for name, _ in modes]
+        imgs = [name_font.render(name, True, TEXT) for name, _, _ in modes]
         x = (self.w - sum(i.get_width() for i in imgs) - MENU_GAP * (len(imgs) - 1)) // 2
-        for i, ((name, desc), img) in enumerate(zip(modes, imgs)):
+        for i, ((name, desc, enabled), img) in enumerate(zip(modes, imgs)):
             r = img.get_rect(midleft=(x, y))
-            if i == sel:
+            if not enabled:                               # greyed out, a still frame if selected
+                if i == sel:
+                    pygame.draw.rect(layer, MENU_OFF, r.inflate(28, 10), 2, border_radius=8)
+                self.text(name_font, name, r.center, MENU_OFF, center=True)
+            elif i == sel:
                 glow = int(170 + 85 * math.sin(t * 4))
                 pygame.draw.rect(layer, (255, 50, 170, glow), r.inflate(28, 10), 2, border_radius=8)
                 self.text(name_font, name, r.center, TEXT, center=True)
             else:
                 self.text(name_font, name, r.center, MENU_DIM, center=True)
             x += img.get_width() + MENU_GAP
-        self.text(desc_font, modes[sel][1], (self.w // 2, y + 36), MENU_DESC, center=True)
+        self.text(desc_font, modes[sel][1], (self.w // 2, y + 36),
+                  MENU_DESC if modes[sel][2] else MENU_DIM, center=True)
         hint = "ENTER  start" if len(modes) == 1 else "LEFT / RIGHT  choose      ENTER  start"
         self.text(desc_font, hint, (self.w // 2, y + 60), MENU_DIM, center=True)
         self.screen = screen

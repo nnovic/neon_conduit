@@ -50,8 +50,10 @@ These were settled with the user; don't change them without asking.
   in Russo One with a neon gradient, a game-mode menu above a scrolling credits banner, and
   "Hero Immortal" playing.
 - Game modes are listed in `MODES` (app.py), chosen with Left / Right, started with Enter.
-  **Voyage** (the only mode so far) is the endless, randomly generated track with the
-  tutorial on the first race. A new mode needs its entry in `MODES` and its own start code.
+  **Challenge** comes first and is selected by default, but is greyed out ("Coming soon",
+  Enter does nothing) until it is implemented. **Voyage** (the only playable mode so far) is
+  the endless, randomly generated track with the tutorial on the first race. A new mode needs
+  its entry in `MODES` (name, description, playable or not) and its own start code.
 
 ### Track and race
 - Every race starts on a long straight in the "original" pattern; the tutorial runs until a
