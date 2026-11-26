@@ -72,6 +72,17 @@ class App:
         self.game.state = "play"
         self.paused = False
 
+    def engine_sound(self):
+        """The sled's engine: idling at the start line, following the speed in the race,
+        fading out on the title, in pause and once the race is over."""
+        game = self.game
+        if game.state == "brief" and self.launch_t is None:
+            self.audio.engine(0.0)
+        elif game.state == "play" and not self.paused:
+            self.audio.engine(game.speed)
+        else:
+            self.audio.engine(None)
+
     def draw(self):
         game = self.game
         if self.launch_t is not None:
@@ -182,6 +193,7 @@ class App:
             t0 = time.perf_counter()
             if game.state == "play" and not self.paused:
                 game.update(dt, game.autopilot() if auto else read_controls(pygame.key.get_pressed(), fire))
+            self.engine_sound()
             self.draw()
             self.work_ms += ((time.perf_counter() - t0) * 1000 - self.work_ms) * 0.05
             if self.show_fps:
