@@ -1,0 +1,181 @@
+{
+  "name": "Example run",
+  "start_time": 25,
+  "sections": [
+    {
+      "length": 60,
+      "bend": 0.0,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    },
+    {
+      "length": 48,
+      "bend": 0.3,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    },
+    {
+      "length": 48,
+      "bend": -0.3,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    },
+    {
+      "length": 44,
+      "bend": 0.25,
+      "slope": 0.0,
+      "kind": "ground",
+      "width": 15,
+      "theme": null
+    },
+    {
+      "length": 44,
+      "bend": -0.2,
+      "slope": 0.0,
+      "kind": "ground",
+      "width": 12,
+      "theme": null
+    },
+    {
+      "length": 40,
+      "bend": 0.0,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    },
+    {
+      "length": 60,
+      "bend": 0.0,
+      "slope": 0.15,
+      "kind": "air",
+      "theme": null
+    },
+    {
+      "length": 60,
+      "bend": 0.0,
+      "slope": -0.15,
+      "kind": "air",
+      "theme": null
+    },
+    {
+      "length": 52,
+      "bend": -0.4,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    },
+    {
+      "length": 40,
+      "bend": 0.0,
+      "slope": 0.0,
+      "kind": "tube",
+      "pattern": null
+    }
+  ],
+  "objects": [
+    {
+      "kind": "drone",
+      "seg": 50,
+      "angle": 0.0,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "drone",
+      "seg": 50,
+      "angle": 0.8,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "drone",
+      "seg": 50,
+      "angle": -0.8,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "boost",
+      "seg": 100,
+      "angle": 0.0
+    },
+    {
+      "kind": "drone",
+      "seg": 140,
+      "angle": 0.4,
+      "sway": 1.2,
+      "rate": 1.6,
+      "speed": 0.0
+    },
+    {
+      "kind": "gate",
+      "seg": 156
+    },
+    {
+      "kind": "boost",
+      "seg": 175,
+      "angle": -0.3
+    },
+    {
+      "kind": "drone",
+      "seg": 210,
+      "angle": 0.2,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "boost",
+      "seg": 250,
+      "angle": 0.0
+    },
+    {
+      "kind": "boost",
+      "seg": 275,
+      "angle": 0.0
+    },
+    {
+      "kind": "boost",
+      "seg": 300,
+      "angle": 0.0
+    },
+    {
+      "kind": "gate",
+      "seg": 340
+    },
+    {
+      "kind": "drone",
+      "seg": 380,
+      "angle": -0.6,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "drone",
+      "seg": 400,
+      "angle": 0.6,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "drone",
+      "seg": 420,
+      "angle": 0.0,
+      "sway": 0.4,
+      "rate": 1.6,
+      "speed": 0.5
+    },
+    {
+      "kind": "gate",
+      "seg": 452
+    }
+  ]
+}

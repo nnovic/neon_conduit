@@ -11,8 +11,8 @@ import random
 import pygame
 
 from . import config
-from .config import (BOOST_FOCAL, BOOST_WARP, PLAYER_D, BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
-                     FOCAL, GATE_SEGS, HORIZON, LINE_HW, NEAR, R, SEG, SIDES,
+from .config import (BOOST_FOCAL, BOOST_WARP, FLOOR_HW, PLAYER_D, BOOST_HW, CAM_H, CAM_LAG, DOOR_OPEN_AT, DOOR_SLIDE, DRAW, FLOOR_A, FLOOR_Y,
+                     FOCAL, HORIZON, LINE_HW, NEAR, R, SEG, SIDES,
                      SKY_RISE_GAIN, SKY_RISE_MAX, SLED_HW, SPEED_CAP, STAR_R,
                      STAR_REACH, STAR_STRETCH, WALL_H, WALL_T)
 from .geometry import (FLOOR_SIDES, OPEN_X, SIDE_A, SIDE_COS, SIDE_LIGHT, SIDE_MID, SIDE_R, SIDE_SIN,
@@ -358,7 +358,7 @@ class Renderer:
     # ----------------------------------------------------------- segments
     def _tube_segment(self, tr, si, r0, r1, fog):
         band = si // 2
-        gate_glow = si % GATE_SEGS in (0, GATE_SEGS - 1)
+        gate_glow = tr.gate_glow(si)
         # One colour scheme and pattern per stretch of tube: they only change out in the open.
         pattern = BY_NAME[tr.tube_style(si)]
         pal = tube_palette(tr.stretch[si], pattern.contrast)
@@ -374,7 +374,7 @@ class Renderer:
 
     def _open_segment(self, tr, si, r0, r1, fog):
         band = si // 2
-        gate_glow = si % GATE_SEGS in (0, GATE_SEGS - 1)
+        gate_glow = tr.gate_glow(si)
         off = FLOOR_SIDES[0]
         for s in FLOOR_SIDES:
             c = GATE_GLOW if gate_glow else FLOOR_COLS[band & 1]
@@ -403,7 +403,7 @@ class Renderer:
         wide = 1 + int(2.5 * near)                  # thicker close up
         halo = wide + 2
         fc = self.fog_col
-        gate = si % GATE_SEGS in (0, GATE_SEGS - 1)
+        gate = tr.gate_glow(si)
         edges = [(r0[s], r1[s], floor if s in FLOOR_EDGES else wall) for s in range(SIDES)]
         if gate or si % 2 == 0:
             ring = GATE_GLOW if gate else wall
@@ -463,6 +463,26 @@ class Renderer:
             if all(pts):
                 pygame.draw.lines(scr, (255, 255, 160), False, [p[:2] for p in pts],
                                   max(2, int(pts[0][2] * 0.5)))
+        elif kind == "finish":
+            # A level's finish line: a chequered band across the floor, under a ring.
+            tr = self.game.track
+            flat = 1.0 if tr.open[int(z // SEG)] else 0.0
+            hw = tr.hw_at(z) if flat else FLOOR_HW
+            cells = 8
+            for row in range(2):
+                for c in range(cells):
+                    x0, x1 = -hw + 2 * hw * c / cells, -hw + 2 * hw * (c + 1) / cells
+                    z0, z1 = z + row * 1.5, z + (row + 1) * 1.5
+                    q = [proj(z0, 0.0, x0, 0.12, False, flat), proj(z0, 0.0, x1, 0.12, False, flat),
+                         proj(z1, 0.0, x1, 0.12, False, flat), proj(z1, 0.0, x0, 0.12, False, flat)]
+                    if all(q):
+                        col = (240, 240, 250) if (c + row) % 2 else (20, 20, 30)
+                        pygame.draw.polygon(scr, col, [p[:2] for p in q])
+            if not flat:
+                pts = [proj(z, a, 0.0, 0.3) for a in SIDE_A]
+                if all(pts):
+                    pygame.draw.lines(scr, (120, 255, 160), False, [p[:2] for p in pts],
+                                      max(2, int(pts[0][2] * 0.5)))
         elif "age" in o:                                      # explosion (or exhaust burst)
             p = proj(z, o["a"], 0.0, o.get("h", 1.5), True)
             if p:

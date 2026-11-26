@@ -23,6 +23,25 @@ class Track:
         """intro: sections of (length, curvature, pitch) to follow the opening straight,
         with nothing on them, before the random track (the tutorial's course)."""
         self.rng = rng
+        self._clear()
+        # The start: a long straight with nothing on it, in the first tunnel's own pattern.
+        if START_PATTERN in BY_NAME:
+            self.tube_styles[0] = START_PATTERN
+        # No gate on the intro (the tutorial has no clock yet): the first one is the first
+        # on the usual grid past its end.
+        end = START_STRAIGHT + sum(n for n, _, _ in intro)
+        self.next_gate = max(GATE_SEGS, -(-end // GATE_SEGS) * GATE_SEGS)
+        self._section(START_STRAIGHT, 0.0, 0.0, False, 0, empty=True)
+        for n, c, p in intro:
+            self._section(n, c, p, False, 0, empty=True)
+        if intro:
+            # The intro ends at a door, into a new stretch of tube (its own pattern and
+            # colours): the real game.
+            self.doors.add(len(self.curv))
+            self.runs += 1
+
+    def _clear(self):
+        """No track yet: every per-segment list empty, nothing on it."""
         self.curv = []
         self.pitch = []
         self.open = []             # outdoors, ground-level: a flat road between kerbs
@@ -39,21 +58,6 @@ class Track:
         self.runs = 0
         self.tube_start = 0        # where the current stretch of tube began
         self.next_gate = GATE_SEGS
-        # The start: a long straight with nothing on it, in the first tunnel's own pattern.
-        if START_PATTERN in BY_NAME:
-            self.tube_styles[0] = START_PATTERN
-        # No gate on the intro (the tutorial has no clock yet): the first one is the first
-        # on the usual grid past its end.
-        end = START_STRAIGHT + sum(n for n, _, _ in intro)
-        self.next_gate = max(GATE_SEGS, -(-end // GATE_SEGS) * GATE_SEGS)
-        self._section(START_STRAIGHT, 0.0, 0.0, False, 0, empty=True)
-        for n, c, p in intro:
-            self._section(n, c, p, False, 0, empty=True)
-        if intro:
-            # The intro ends at a door, into a new stretch of tube (its own pattern and
-            # colours): the real game.
-            self.doors.add(len(self.curv))
-            self.runs += 1
 
     def ensure(self, seg_index, level):
         """Generate track up to segment seg_index, with the difficulty of gate level."""
@@ -97,6 +101,11 @@ class Track:
         """True where a door closes off segment i: tube following an outdoor section, or the
         end of the intro."""
         return i in self.doors or (0 < i < len(self.open) and self.outdoor(i - 1) and not self.outdoor(i))
+
+    def gate_glow(self, i):
+        """True where the tube's walls glow white around a gate: the segments either side of
+        each one, on the random track's fixed grid of gates."""
+        return i % GATE_SEGS in (0, GATE_SEGS - 1)
 
     def door_angle(self, i):
         """Tilt of door i's split line: vertical, horizontal or either diagonal, picked at

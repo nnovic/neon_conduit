@@ -26,7 +26,8 @@ def read_controls(keys, fire):
 
 
 class App:
-    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False, show_fps=False):
+    def __init__(self, seed=None, size=SCREEN, focal=FOCAL, horizon=HORIZON, fullscreen=False, show_fps=False,
+                 course=None, start_seg=0):
         pygame.init()
         pygame.display.set_caption("Neon Conduit")
         # SCALED: the game always draws at size; pygame blows it up to fill the screen in
@@ -36,7 +37,7 @@ class App:
         pygame.mouse.set_visible(not fullscreen)
         self.clock = pygame.time.Clock()
         self.audio = Audio()
-        self.game = Game(seed, self.audio)
+        self.game = Game(seed, self.audio, course, start_seg)
         self.renderer = Renderer(self.screen, focal, horizon)
         self.hud = Hud(self.screen)
         self.title = TitleFlag(self.screen)
@@ -119,6 +120,8 @@ class App:
         auto = frames is not None
         if auto:
             game.state = "play"
+        elif game.course:                   # a level: straight to its start line
+            game.state = "brief"
         else:
             self.audio.music(TITLE_MUSIC, TITLE_MUSIC_VOLUME, TITLE_MUSIC_FADE)
         count = 0
@@ -186,8 +189,18 @@ def main():
     ap.add_argument("--screenshot", help="with --frames, save the last frame to this file")
     ap.add_argument("--fullscreen", action="store_true", help="start in full screen (F11 toggles it)")
     ap.add_argument("--fps", action="store_true", help="show frames per second and frame time (F3 toggles it)")
+    ap.add_argument("--level", metavar="FILE", help="race a hand-made level (see edit_level.py) to its finish line")
+    ap.add_argument("--from", dest="start_seg", type=int, default=0, metavar="SEG",
+                    help="with --level, start at this segment of it")
     args = ap.parse_args()
-    app = App(args.seed, fullscreen=args.fullscreen, show_fps=args.fps)
+    course = None
+    if args.level:
+        from .level import LevelError, load
+        try:
+            course = load(args.level)
+        except (OSError, LevelError) as e:
+            ap.exit(1, "Can't race %s: %s\n" % (args.level, e))
+    app = App(args.seed, fullscreen=args.fullscreen, show_fps=args.fps, course=course, start_seg=args.start_seg)
     try:
         app.run(args.frames, args.screenshot)
     finally:

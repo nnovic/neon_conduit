@@ -22,20 +22,31 @@ IDLE = Controls(0, False)
 
 
 class Game:
-    def __init__(self, seed=None, audio=None):
+    def __init__(self, seed=None, audio=None, course=None, start_seg=0):
+        """course: a level (see level.py) to race to its finish line, instead of the endless
+        random track; start_seg: the segment of it to start from (to try part of a level)."""
         self.seed = seed
         self.audio = audio or Silent()
+        self.course = course
+        self.start_seg = start_seg
         self.best = 0
-        self.state = "title"        # "title", "brief" (on the start line), "play" or "over"
+        # "title", "brief" (on the start line), "play", "over" (out of time) or "finished"
+        # (over a level's finish line)
+        self.state = "title"
         self.tutorial = None
         self.reset()
 
     def reset(self):
-        # The tutorial is for the first race only: once that is under way, later ones get none.
-        self.tutorial = Tutorial(() if self.tutorial and self.tutorial.started else TIPS)
         self.rng = random.Random(self.seed)
-        # With a tutorial, the track starts on its fixed course; the random track comes after.
-        self.track = Track(self.rng, COURSE if self.tutorial.tips else ())
+        if self.course:
+            # A level: no tutorial, the clock running from the start, the level's own track.
+            self.tutorial = Tutorial(())
+            self.track = self.course.build()
+        else:
+            # The tutorial is for the first race only: once that is under way, later ones get none.
+            self.tutorial = Tutorial(() if self.tutorial and self.tutorial.started else TIPS)
+            # With a tutorial, the track starts on its fixed course; the random track comes after.
+            self.track = Track(self.rng, COURSE if self.tutorial.tips else ())
         self.cam_z = 0.0
         self.theta = 0.0        # sled angle on the wall, 0 = floor
         self.omega = 0.0
@@ -45,7 +56,8 @@ class Game:
         self.chain = 0          # boost pads hit one after the other, each before the last wore off
         self.chain_k = 0.0      # how much of the boost's view effects that chain earns, eased
         self.invincible = 0.0   # seconds left during which drones can't hurt the sled
-        self.time_left = START_TIME
+        self.time_left = self.course.start_time if self.course else START_TIME
+        self.race_t = 0.0       # seconds since the start (a level's finishing time)
         self.level = 0
         self.score = 0
         self.bullets = []
@@ -69,6 +81,9 @@ class Game:
                                 # gate passed, or where the clock started
         self.skipping = None    # seconds into skipping the tutorial, or None
         self.door_sounds = []   # (channel, sound, depth) of each door sliding open within earshot
+        if self.course and self.start_seg:
+            self.cam_z = max(0.0, self.start_seg * SEG - PLAYER_D)
+            self.prev_z = self.gate_from = self.sled_z
         self.music_at = None    # game time the race music is due (once the first door is passed)
         self.now_playing = None # the race music's tags, as it starts (see nowplaying.read_tags)...
         self.music_t = 0.0      # ...and the game clock then
@@ -150,6 +165,7 @@ class Game:
     # -------------------------------------------------------------- update
     def update(self, dt, controls):
         self.t += dt
+        self.race_t += dt
         if self.skipping is not None:
             jump = self.skipping < SKIP_FADE <= self.skipping + dt
             self.skipping += dt
@@ -171,6 +187,8 @@ class Game:
         self._effects(dt)
 
         self.score += int(self.speed * dt)
+        if self.state == "finished":
+            self.best = max(self.best, self.score)
         self.shake = max(0.0, self.shake - dt)
         self.flash = max(0.0, self.flash - dt)
         self.msg = (self.msg[0], self.msg[1] - dt)
@@ -183,7 +201,7 @@ class Game:
             self.gate_from = pz
         if self.tutorial.clock:             # the tutorial holds the clock back for a while
             self.time_left -= dt
-        if self.time_left <= 0:
+        if self.time_left <= 0 and self.state == "play":
             self.time_left = 0.0
             self.best = max(self.best, self.score)
             self.state = "over"
@@ -194,7 +212,9 @@ class Game:
         """The race music starts a little after the sled passes the race's first door (the
         tutorial's, in the first race)."""
         if self.music_at is None:
-            if any(self.track.is_door(i) for i in range(int(self.prev_z // SEG) + 1, int(pz // SEG) + 1)):
+            if self.course:                         # a level: soon after the start
+                self.music_at = self.t + RACE_MUSIC_DELAY
+            elif any(self.track.is_door(i) for i in range(int(self.prev_z // SEG) + 1, int(pz // SEG) + 1)):
                 self.music_at = self.t + RACE_MUSIC_DELAY
         elif self.music_at <= self.t:
             self.music_at = float("inf")            # once only
@@ -470,9 +490,20 @@ class Game:
                     self.time_left += bonus
                     self.msg = ("GATE %d   +%d s" % (self.level, bonus), 2.0)
                     self.audio.play("gate")
+            elif kind == "finish":
+                if self.prev_z < z <= pz and self.state == "play":
+                    self._finish()
             if alive:
                 keep.append(o)
         tr.objects = keep
+
+    def _finish(self):
+        """Over a level's finish line: every second left on the clock scores."""
+        self.score += int(self.time_left * 100)
+        self.state = "finished"
+        self.audio.play("gate")
+        self.audio.stop_music(RACE_MUSIC_FADE)
+        self.now_playing = None
 
     def _hint_stars(self, pz):
         """Ride through a hint star (on the fast line) to pick it up."""

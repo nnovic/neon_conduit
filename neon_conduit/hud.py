@@ -207,6 +207,11 @@ class Hud:
             self.text(self.big, "TIME UP", (mid, 190), (255, 70, 60), center=True)
             lines = ["Score %d     Gates %d" % (game.score, game.level),
                      "Best %d" % game.best, "", "Press ENTER to race again"]
+        elif game.state == "finished":
+            m, s = divmod(game.race_t, 60)
+            self.text(self.big, "FINISH", (mid, 190), (120, 255, 160), center=True)
+            lines = ["Time %d:%04.1f     %.1f s left on the clock" % (m, s, game.time_left),
+                     "Score %d     Best %d" % (game.score, game.best), "", "Press ENTER to race again"]
         else:
             self.text(self.big, "PAUSED", (mid, 250), center=True)
             lines = []
