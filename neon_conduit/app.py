@@ -13,6 +13,8 @@ from .title import TitleFlag, TitleTunnel, ease
 
 LAUNCH_MOVE = 1.6               # seconds the title's tunnel takes to glide into the game's view...
 LAUNCH_FADE = 0.8               # ...and the title then takes to fade into the game
+# The title menu's game modes: name and what it is.
+MODES = (("VOYAGE", "An endless track, new every race: reach each gate before the clock runs out"),)
 
 
 def read_controls(keys, fire):
@@ -45,6 +47,7 @@ class App:
         self.title_tunnel = TitleTunnel(self.screen, (r.focal, r.cx, r.cy))
         self.title_t = 0.0          # clock of the title screen's flag and tunnel
         self.launch_t = None        # time since ENTER on the title, while it turns into the game
+        self.mode = 0               # the game mode selected in the title menu, in MODES
         self.paused = False
         self.show_fps = show_fps    # F3: frames per second and the work each frame takes
         self.work_ms = 0.0          # milliseconds of game update and drawing per frame, smoothed
@@ -76,6 +79,7 @@ class App:
             self.title.draw(self.title_t)
             # The tunnel goes over the darkened middle, so it stands out, but under the text.
             self.hud.overlay(game, lambda: self.title_tunnel.draw(self.title_t))
+            self.hud.title_menu(MODES, self.mode, self.title_t)
             self.hud.credits(self.title_t)
             return
         self.renderer.draw(game)
@@ -102,6 +106,7 @@ class App:
         scr.blit(veil, (0, 0))
         self.title_tunnel.draw(self.title_t, u)
         self.hud.title_text(int(255 * (1 - u)))
+        self.hud.title_menu(MODES, self.mode, self.title_t, int(255 * (1 - u)))
         self.hud.credits(self.title_t, int(255 * (1 - u)))
         if s > LAUNCH_MOVE:
             title = scr.copy()
@@ -148,10 +153,13 @@ class App:
                     if game.state == "brief":            # any key sets the racer off...
                         self.start(False)
                         continue                           # ...and does nothing else
+                    if game.state == "title" and ev.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                        self.mode = (self.mode + (1 if ev.key == pygame.K_RIGHT else -1)) % len(MODES)
+                        continue
                     if ev.key == pygame.K_SPACE:
                         fire = True
                     if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and game.state != "play":
-                        if game.state == "title":         # off to the start line
+                        if game.state == "title":         # off to the start line (Voyage, the only mode yet)
                             game.reset()
                             self.launch_t = 0.0
                             self.title_tunnel.depart(self.title_t)

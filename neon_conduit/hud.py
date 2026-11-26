@@ -24,6 +24,10 @@ CREDITS_LINE = ('Music: "Hero Immortal" by Trevor Lentz (CC BY-SA 3.0, opengamea
 CREDITS_H = 26                  # height of the banner's strip
 CREDITS_SPEED = 70.0            # pixels per second it scrolls to the left
 CREDITS_COL = (190, 200, 230)
+MENU_H = 100                    # height of the title menu, just above the credits banner
+MENU_GAP = 60                   # pixels between two modes' names
+MENU_DIM = (150, 160, 200)      # modes not selected, and the keys' hint
+MENU_DESC = (255, 220, 150)     # the selected mode's description
 BRIEF = ["Left / Right  steer      Up / Down  aim      Space  fire",
          "P  pause      F11  full screen      Esc  quit",
          "",
@@ -85,6 +89,7 @@ class Hud:
         self.title_layer = None     # the title screen's text, to fade out at launch
         self.credits_strip = None   # the credits banner's strip, and its line of text
         self.credits_text = None
+        self.menu_fonts = None      # the title menu's fonts: mode names, descriptions
 
     def text(self, font, s, pos, col=TEXT, center=False):
         """Text with a drop shadow, at its top-left corner or centred on pos."""
@@ -153,18 +158,44 @@ class Hud:
         self.screen.blit(self.band, (0, BAND_Y))
 
     def title_text(self, alpha=255):
-        """The title and the prompt to start, alpha from 0 (gone) to 255."""
+        """The title, alpha from 0 (gone) to 255."""
         if self.title_layer is None:
             self.title_layer = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
             screen, self.screen = self.screen, self.title_layer
             mid = self.w // 2
             title, pad = neon_title("NEON CONDUIT", int(self.w * TITLE_WIDTH))
             self.screen.blit(title, title.get_rect(midtop=(mid, 18 - pad)))
-            prompt = pygame.font.Font(TITLE_FONT, 30)
-            self.text(prompt, "Press ENTER to start", (mid, self.h - CREDITS_H - 34), center=True)
             self.screen = screen
         self.title_layer.set_alpha(alpha)
         self.screen.blit(self.title_layer, (0, 0))
+
+    def title_menu(self, modes, sel, t, alpha=255):
+        """The game modes in a row under the tunnel, the selected one framed and its
+        description below; t pulses the frame, alpha from 0 (gone) to 255."""
+        if self.menu_fonts is None:
+            self.menu_fonts = (pygame.font.Font(TITLE_FONT, 30), pygame.font.Font(TITLE_FONT, 16))
+        name_font, desc_font = self.menu_fonts
+        top = self.h - CREDITS_H - MENU_H                 # just above the credits banner
+        layer = pygame.Surface((self.w, MENU_H), pygame.SRCALPHA)
+        screen, self.screen = self.screen, layer
+        y = 26
+        imgs = [name_font.render(name, True, TEXT) for name, _ in modes]
+        x = (self.w - sum(i.get_width() for i in imgs) - MENU_GAP * (len(imgs) - 1)) // 2
+        for i, ((name, desc), img) in enumerate(zip(modes, imgs)):
+            r = img.get_rect(midleft=(x, y))
+            if i == sel:
+                glow = int(170 + 85 * math.sin(t * 4))
+                pygame.draw.rect(layer, (255, 50, 170, glow), r.inflate(28, 10), 2, border_radius=8)
+                self.text(name_font, name, r.center, TEXT, center=True)
+            else:
+                self.text(name_font, name, r.center, MENU_DIM, center=True)
+            x += img.get_width() + MENU_GAP
+        self.text(desc_font, modes[sel][1], (self.w // 2, y + 36), MENU_DESC, center=True)
+        hint = "ENTER  start" if len(modes) == 1 else "LEFT / RIGHT  choose      ENTER  start"
+        self.text(desc_font, hint, (self.w // 2, y + 60), MENU_DIM, center=True)
+        self.screen = screen
+        layer.set_alpha(alpha)
+        self.screen.blit(layer, (0, top))
 
     def credits(self, t, alpha=255):
         """The credits banner along the bottom of the title screen, scrolled to time t,
