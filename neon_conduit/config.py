@@ -36,21 +36,28 @@ NOW_PLAYING_FADE = 0.6  # seconds the HUD's track panel (title, artist, album) t
 NOW_PLAYING_HOLD = 8.0  # ...and stays up in between, as the race music starts...
 NOW_PLAYING_EVERY = 60.0  # ...and again this many seconds later, and so on while it plays
 STAR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "completetask_0.wav")   # see CREDITS.md
+# The sound mix: each sound effect's loudness, 0 .. 1, against the music above. All of them
+# can be balanced by ear with tools/sound_mix.py, which writes them back here.
 STAR_SOUND_VOLUME = 0.5
 BOOST_SOUND = os.path.join(os.path.dirname(__file__), "assets", "Sequence_SciFi Pack Vol 1_Energy BuildUp to LOOP_Med_Start_var 1.wav")   # see CREDITS.md
 BOOST_SOUND_VOLUME = 0.6
 DOOR_SOUND = os.path.join(os.path.dirname(__file__), "assets", "rock_metal_slide_2.wav")   # see CREDITS.md
 DOOR_SOUND_VOLUME = 1.0   # the recording itself is quiet (peaks near -14 dBFS)
+SHOT_SOUND_VOLUME = 0.25    # the guns' zap (made by the game, like the four below)
+HIT_SOUND_VOLUME = 0.45     # the crunch of a drone hitting the sled
+BOOM_SOUND_VOLUME = 0.3     # a drone shot down
+GATE_SOUND_VOLUME = 0.3     # a checkpoint gate passed
+SCRAPE_SOUND_VOLUME = 0.22  # grinding along a kerb
 # The sled's engine: a synthesized hum whose pitch follows the speed, from a low idle while
 # standing still up to its highest at full boost on top cruising speed (SPEED_CAP x BOOST_MULT).
-ENGINE_IDLE_HZ = 73.106   # its pitch at a standstill, in Hz...
+ENGINE_IDLE_HZ = 73.106  # its pitch at a standstill, in Hz...
 ENGINE_TOP_HZ = 257.617   # ...and at full speed, rising evenly in musical steps in between
-ENGINE_VOLUME = 0.6    # its loudness at full speed, 0 .. 1...
+ENGINE_VOLUME = 0.6     # its loudness at full speed, 0 .. 1...
 ENGINE_IDLE_VOLUME = 0.425   # ...and at a standstill
-ENGINE_BUZZ = 0.8      # its tone, 0 .. 1: 0 a soft, round hum, 1 a harsh buzz (more overtones)
+ENGINE_BUZZ = 0.8       # its tone, 0 .. 1: 0 a soft, round hum, 1 a harsh buzz (more overtones)
 ENGINE_SHIMMER = 3.0    # a second voice this many percent higher: the two beat, a slow shimmer
                         # (0: one plain voice)
-ENGINE_THROB = 0.502      # how deep it pulses, at half its pitch, 0 .. 1 (0: a steady drone)
+ENGINE_THROB = 0.502    # how deep it pulses, at half its pitch, 0 .. 1 (0: a steady drone)
 # Those can be tuned by ear with tools/engine_sound.py, which writes them back here.
 ENGINE_FADE = 0.4       # seconds it takes to fade in (at the start line) and out (pause, game over)
 ENGINE_LEAD = 0.12      # seconds of engine sound made ahead of what is playing: a slow frame
@@ -109,11 +116,15 @@ BOOST_HW = 2.2
 AIM_SLOPE = 0.08        # full aim lifts (Down) or drops (Up) shots this many units per unit forward
 AIM_RATE = 4.0          # how fast the aim swings, in full ranges per second
 GUN_SPREAD = 1.2        # each twin gun sits this far left / right of the sled's middle
+FIRE_INTERVAL = 0.16    # seconds between two volleys while Space is held
 BULLET_SPEED = 260.0    # shots fly this much faster than the sled was going when they left
 BULLET_LIFE = 0.9       # seconds before a shot fizzles out
 LOCK_RANGE = 60.0       # drones up to this far ahead can be locked on to (near ones only)
-LOCK_ANGLE = 0.14       # ...if a straight shot reaches them within this angle (radians, 8 deg)
-                        # of the sled's heading: the target must be roughly in front
+LOCK_ANGLE = 0.14       # ...if a straight shot reaches them within this angle of the sled's
+                        # heading, in radians (0.1 is 5.7 deg): the target must be roughly in front
+DRONE_HIT_R = 3.0       # a shot passing this close to a drone's middle (world units) downs it
+# The guns and their lock-on can be tuned in a live race with tools/aim_tuner.py, which writes
+# them back here (with AIM_*, BULLET_*, GUN_SPREAD and DRONE_SPEED).
 DRONE_SPEED = 0.5       # drones fly forward at this fraction of top speed
 RING_DRONES = 12        # the tutorial's ring of drones: this many, evenly round the tube
                         # (closer than a sled's width apart: no way through but to shoot one)

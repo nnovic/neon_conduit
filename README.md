@@ -143,6 +143,8 @@ other settings in that file control the tube, the track, the physics and the tim
 |---|---|---|
 | [`tools/make_ship.py`](tools/make_ship.py) | Builds the racer model, `neon_conduit/assets/ship.obj` (a plain Wavefront OBJ, which Blender can open) | — |
 | [`tools/engine_sound.py`](tools/engine_sound.py) | Plays the racer's engine endlessly at a speed you pick, with sliders for its pitch range, volume, buzz, shimmer and throb; S saves them in `config.py` | — |
+| [`tools/sound_mix.py`](tools/sound_mix.py) | Balances the music, the engine and each sound effect with sliders, with a race demo to hear them all together; S saves them in `config.py` | — |
+| [`tools/aim_tuner.py`](tools/aim_tuner.py) | A live race (autopilot or you driving) with sliders for the guns and their lock-on, and counts of the drones met and shot down; S saves them in `config.py` | — |
 | [`tools/make_panoramas.py`](tools/make_panoramas.py) | Paints the 360° outdoor backdrops, `neon_conduit/assets/sky_*.jpg` | numpy |
 | [`promo/make_ad.py`](promo/make_ad.py) | Renders a short vertical promo video, using the game's own engine | GStreamer (`gst-launch-1.0`, x264enc, mp4mux) |
 

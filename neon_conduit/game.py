@@ -8,7 +8,7 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_CHAIN, BOOST_CHAIN_EASE, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, INVINCIBLE_TIME,
+from .config import (BASE_SPEED, BOOST_CHAIN, BOOST_CHAIN_EASE, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, DRONE_HIT_R, FIRE_INTERVAL, INVINCIBLE_TIME,
                      DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
                      DRONE_SPEED, RACE_MUSIC_DELAY, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
@@ -301,7 +301,7 @@ class Game:
     def _shoot(self, dt, fire, pz):
         self.cooldown -= dt
         if fire and self.cooldown <= 0:
-            self.cooldown = 0.16
+            self.cooldown = FIRE_INTERVAL
             v = self.speed + BULLET_SPEED
             for side in (-GUN_SPREAD, GUN_SPREAD):              # twin guns, side by side
                 x, y = wall_xy(self.theta, side, 1.0, True, self.flat)
@@ -452,7 +452,7 @@ class Game:
                 ox, oy = wall_xy(o["a"], 0.0, 1.5, True, 1.0 if flat else 0.0)
                 for b in self.bullets:
                     if (b["life"] > 0 and b["pz"] - 2 <= z <= b["z"] + 2
-                            and math.hypot(b["x"] - ox, b["y"] - oy) < 3.0):
+                            and math.hypot(b["x"] - ox, b["y"] - oy) < DRONE_HIT_R):
                         b["life"] = 0
                         alive = False
                         self.score += 500

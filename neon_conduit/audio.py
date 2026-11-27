@@ -7,7 +7,9 @@ from array import array
 
 import pygame
 
-from .config import (BOOST_MULT, BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND, DOOR_SOUND_VOLUME,
+from .config import (BOOM_SOUND_VOLUME, BOOST_MULT, BOOST_SOUND, BOOST_SOUND_VOLUME, DOOR_SOUND,
+                     DOOR_SOUND_VOLUME, GATE_SOUND_VOLUME, HIT_SOUND_VOLUME, SCRAPE_SOUND_VOLUME,
+                     SHOT_SOUND_VOLUME,
                      ENGINE_BUZZ, ENGINE_FADE, ENGINE_IDLE_HZ, ENGINE_IDLE_VOLUME, ENGINE_LEAD, ENGINE_RING, ENGINE_SHIMMER,
                      ENGINE_THROB, ENGINE_TOP_HZ, ENGINE_VOLUME, RACE_MUSIC_DIR, RACE_MUSIC_EXTS, RACE_MUSIC_FADE, RACE_MUSIC_VOLUME, STAR_SOUND,
                      SPEED_CAP, STAR_SOUND_VOLUME)
@@ -28,6 +30,14 @@ def engine_tone(speed):
             ENGINE_IDLE_VOLUME + (ENGINE_VOLUME - ENGINE_IDLE_VOLUME) * k)
 
 
+def sound_volumes():
+    """Each sound effect's loudness, 0 .. 1, as the mix in config.py sets it. Read when
+    called, so tools/sound_mix.py can change them as they play."""
+    return {"shot": SHOT_SOUND_VOLUME, "boost": BOOST_SOUND_VOLUME, "hit": HIT_SOUND_VOLUME,
+            "boom": BOOM_SOUND_VOLUME, "gate": GATE_SOUND_VOLUME, "scrape": SCRAPE_SOUND_VOLUME,
+            "door": DOOR_SOUND_VOLUME, "star": STAR_SOUND_VOLUME}
+
+
 class Audio:
     RATE = 22050                # the mixer format asked for: 16-bit mono at this rate
 
@@ -43,19 +53,18 @@ class Audio:
                 pygame.mixer.quit()
                 pygame.mixer.init(self.RATE, -16, 1, 512)
                 self.rate, size, self.channels = pygame.mixer.get_init()
+            # Each made at full strength (or loaded); how loud it plays is the mix's business.
             self.sounds = {
-                "shot": self._sweep(900, 300, 0.09, 0.25),
-                "boost": self._file(BOOST_SOUND, BOOST_SOUND_VOLUME)
-                         or self._sweep(200, 900, 0.35, 0.3),
-                "hit": self._noise(0.3, 0.45),
-                "boom": self._noise(0.22, 0.3),
-                "gate": self._sweep(500, 1300, 0.45, 0.3),
-                "scrape": self._noise(0.14, 0.22),
-                "door": self._file(DOOR_SOUND, DOOR_SOUND_VOLUME)
-                        or self._sweep(160, 60, 0.6, 0.18),
-                "star": self._file(STAR_SOUND, STAR_SOUND_VOLUME)
-                        or self._sweep(1400, 2100, 0.07, 0.12),
+                "shot": self._sweep(900, 300, 0.09),
+                "boost": self._file(BOOST_SOUND) or self._sweep(200, 900, 0.35),
+                "hit": self._noise(0.3),
+                "boom": self._noise(0.22),
+                "gate": self._sweep(500, 1300, 0.45),
+                "scrape": self._noise(0.14),
+                "door": self._file(DOOR_SOUND) or self._sweep(160, 60, 0.6),
+                "star": self._file(STAR_SOUND) or self._sweep(1400, 2100, 0.07),
             }
+            self.apply_mix()
             # The engine plays on a channel of its own, out of reach of the other sounds: a
             # loop of ENGINE_RING seconds, played over and over, that engine() keeps writing
             # the coming sound into, just ahead of the part playing. (Queueing short sounds one
@@ -77,15 +86,18 @@ class Audio:
         except pygame.error:
             pass
 
-    def _file(self, path, vol):
+    def apply_mix(self):
+        """Set each sound effect's loudness from its *_SOUND_VOLUME (see sound_volumes)."""
+        for name, vol in sound_volumes().items():
+            self.sounds[name].set_volume(vol)
+
+    def _file(self, path):
         """The sound in the file at path, or None if it can't be loaded."""
         try:
-            sound = pygame.mixer.Sound(path)
+            return pygame.mixer.Sound(path)
         except (pygame.error, OSError) as e:
             print("No sound (%s): %s" % (path, e))
             return None
-        sound.set_volume(vol)
-        return sound
 
     def _sound(self, buf):
         """A Sound from 16-bit samples made at the mixer's rate: the same in every speaker."""
@@ -97,7 +109,7 @@ class Audio:
             buf = out
         return pygame.mixer.Sound(buffer=buf.tobytes())
 
-    def _sweep(self, f0, f1, dur, vol):
+    def _sweep(self, f0, f1, dur, vol=1.0):
         """Square-wave pitch sweep from f0 to f1 Hz, fading out."""
         n = int(self.rate * dur)
         buf, phase = array("h"), 0.0
@@ -108,7 +120,7 @@ class Audio:
             buf.append(int(32767 * vol * (1 - t) * sq))
         return self._sound(buf)
 
-    def _noise(self, dur, vol):
+    def _noise(self, dur, vol=1.0):
         """Crunchy noise burst, fading out."""
         n = int(self.rate * dur)
         hold = max(1, round(self.rate / NOISE_GRAIN))   # samples each random level lasts
