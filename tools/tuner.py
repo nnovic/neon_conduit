@@ -21,6 +21,7 @@ from neon_conduit import config  # noqa: E402
 CONFIG = os.path.join(ROOT, "neon_conduit", "config.py")
 COMMENT_COL = 24            # config.py's comments start at this column, or further if need be
 ROW = 44                    # pixels from one slider to the next
+HEAD_H = 30                 # pixels for a group's heading
 LABEL_W = 170               # pixels for the labels, left of the sliders...
 VALUE_W = 90                # ...and for the values, right of them
 BACK = (12, 14, 30)
@@ -28,6 +29,8 @@ TEXT = (230, 235, 255)
 DIM = (130, 140, 180)
 ACCENT = (255, 50, 170)
 NOTE = (120, 230, 140)
+TOOL = (110, 200, 255)      # the tool's own sliders (not saved): their heading, picked slider...
+TOOL_DIM = (80, 130, 170)   # ...and the others
 
 
 class Setting:
@@ -77,13 +80,28 @@ def save_config(values, steps):
 class Panel:
     """The sliders, drawn in rect (a pygame.Rect) and worked with the mouse (click or drag
     one) and, if keys is on, the keyboard: Up / Down pick, Left / Right move (Shift: x10),
-    Home / End to the lowest / highest. on_change(setting) is called after each change."""
+    Home / End to the lowest / highest. on_change(setting) is called after each change.
 
-    def __init__(self, settings, rect, keys=True, on_change=None):
-        self.settings, self.rect, self.keys, self.on_change = settings, rect, keys, on_change
+    The sliders come in two groups, each under its heading (titles): the tool's own, which
+    only change what is shown or heard and are not saved (in blue), then the game's settings,
+    which S saves into config.py."""
+
+    def __init__(self, settings, rect, keys=True, on_change=None,
+                 titles=("THE TOOL'S OWN  -  not saved", "GAME SETTINGS  -  S saves them in config.py")):
+        own = [s for s in settings if not s.name]
+        self.settings = own + [s for s in settings if s.name]
+        self.rect, self.keys, self.on_change = rect, keys, on_change
         self.sel, self.dragging = 0, None
         self.saved = {s.name: s.value for s in settings if s.name}     # as in config.py
-        self.font = pygame.font.Font(None, 25)
+        self.font, self.head_font = pygame.font.Font(None, 25), pygame.font.Font(None, 22)
+        # Where each slider sits, and each group's heading (only for groups with sliders).
+        self.heads, self.ys, y = [], [], rect.y
+        for i, s in enumerate(self.settings):
+            if i == 0 or (s.name is None) != (self.settings[i - 1].name is None):
+                self.heads.append((y, titles[0] if s.name is None else titles[1], s.name is None))
+                y += HEAD_H
+            self.ys.append(y + 16)
+            y += ROW
 
     @property
     def selected(self):
@@ -118,7 +136,7 @@ class Panel:
     def _track(self, i):
         """The slider's ends (x) and height (y) for setting i."""
         x0 = self.rect.x + LABEL_W
-        return x0, self.rect.right - VALUE_W - 12, self.rect.y + 16 + i * ROW
+        return x0, self.rect.right - VALUE_W - 12, self.ys[i]
 
     def _value_at(self, i, x):
         s, (x0, x1, _) = self.settings[i], self._track(i)
@@ -167,11 +185,32 @@ class Panel:
     def y_of(self, i):
         return self._track(i)[2]
 
+    def row_at(self, y):
+        """The slider at height y, or None."""
+        for i, sy in enumerate(self.ys):
+            if abs(y - sy) < ROW // 2 - 4:
+                return i
+        return None
+
+    @property
+    def bottom(self):
+        """Just below the last slider."""
+        return self.ys[-1] + ROW // 2
+
     def draw(self, screen):
+        for y, title, own in self.heads:
+            col = TOOL if own else ACCENT
+            img = self.head_font.render(title, True, col)
+            screen.blit(img, (self.rect.x, y + 6))
+            pygame.draw.line(screen, col, (self.rect.x + img.get_width() + 10, y + 13),
+                             (self.rect.right, y + 13), 1)
         for i, s in enumerate(self.settings):
             x0, x1, y = self._track(i)
             on = i == self.sel and self.keys
-            col = TEXT if on else DIM
+            if s.name is None:
+                col = TOOL if on else TOOL_DIM
+            else:
+                col = TEXT if on else DIM
             label = s.label + (" *" if self.changed(s) else "")
             screen.blit(self.font.render(label, True, col), (self.rect.x, y - 8))
             pygame.draw.line(screen, col, (x0, y), (x1, y), 3 if on else 2)

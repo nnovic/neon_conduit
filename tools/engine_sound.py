@@ -24,7 +24,7 @@ from tuner import Setting
 from neon_conduit import audio as engine
 from neon_conduit.config import BASE_SPEED, BOOST_MULT, SPEED_CAP
 
-SIZE = (800, 520)           # the window, in pixels
+SIZE = (800, 580)           # the window, in pixels
 SPEED_UP = 70.0             # glide rates, in speed per second: the game's (Game._move)...
 SLOW_DOWN = 55.0            # ...when speeding up and slowing down
 MARKS = (("cruise", BASE_SPEED), ("top cruise", SPEED_CAP),
@@ -53,7 +53,8 @@ def main():
         Setting("buzz", "ENGINE_BUZZ", 0.0, 1.0, 0.01),
         Setting("shimmer", "ENGINE_SHIMMER", 0.0, 6.0, 0.05, "%.2f %%"),
         Setting("throb", "ENGINE_THROB", 0.0, 1.0, 0.01),
-    ], pygame.Rect(20, 80, SIZE[0] - 40, 400), on_change=changed)
+    ], pygame.Rect(20, 70, SIZE[0] - 40, 400), on_change=changed,
+        titles=("LISTENING  -  not saved", "ENGINE SOUND  -  S saves it in config.py"))
     big, small = pygame.font.Font(None, 34), pygame.font.Font(None, 21)
     clock = pygame.time.Clock()
     speed, glide, paused, note = 0.0, True, False, ""

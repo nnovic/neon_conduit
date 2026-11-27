@@ -81,7 +81,7 @@ def main():
             sound.apply_mix()
 
     panel = tuner.Panel([Setting(label, name, 0.0, 1.0, 0.01) for label, name, _ in SLIDERS],
-                        pygame.Rect(20, 110, SIZE[0] - 40, 12 * tuner.ROW), on_change=changed)
+                        pygame.Rect(20, 100, SIZE[0] - 40, 12 * tuner.ROW), on_change=changed)
 
     def play(i):
         what = SLIDERS[i][2]
@@ -104,8 +104,8 @@ def main():
                 pygame.quit()
                 return
             if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1 and ev.pos[0] < 20 + tuner.LABEL_W:
-                i = round((ev.pos[1] - panel.y_of(0)) / tuner.ROW)
-                if 0 <= i < len(SLIDERS):           # a click on a name: play that sound
+                i = panel.row_at(ev.pos[1])
+                if i is not None:                   # a click on a name: play that sound
                     panel.sel = i
                     play(i)
                 continue
