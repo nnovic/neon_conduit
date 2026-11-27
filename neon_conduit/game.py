@@ -8,7 +8,7 @@ import random
 from collections import namedtuple
 
 from .audio import Silent
-from .config import (BASE_SPEED, BOOST_CHAIN, BOOST_CHAIN_EASE, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_KEEP, DIVE_SETTLE, DRONE_HIT_R, FIRE_INTERVAL, INVINCIBLE_TIME,
+from .config import (BASE_SPEED, BOOST_CHAIN, BOOST_CHAIN_EASE, BOOST_HW, BOOST_MULT, AIM_RATE, AIM_SLOPE, BOOST_TIME, CRASH_BACK, CRASH_FRONT, CRASH_KEEP, CRASH_WIDTH, DIVE_SETTLE, DRONE_HIT_R, FIRE_INTERVAL, INVINCIBLE_TIME,
                      DOOR_HEAR_NEAR, DOOR_OPEN_AT, DRAW, FLAT_MAX, FLOOR_A, BULLET_LIFE, BULLET_SPEED, GUN_SPREAD, LINE_FALLOFF, LOCK_ANGLE, LOCK_RANGE, LINE_SLOW, LINE_TOL, PLAYER_D, SCRAPE_DRAG,
                      SCRAPE_FLOOR, SEG, SLED_HW, SPEED_CAP, STAR_SCORE, START_TIME,
                      DRONE_SPEED, RACE_MUSIC_DELAY, RACE_MUSIC_FADE, RING_AHEAD, RING_DRONES)
@@ -459,7 +459,8 @@ class Game:
                         self.effects.append({"z": z, "a": o["a"], "age": 0.0})
                         self.audio.play("boom")
                         break
-                if alive and abs(z - pz) < 2.5 and lat_dist(o["a"], self.theta, flat) < 3.2:
+                if (alive and -CRASH_BACK < z - pz < CRASH_FRONT
+                        and lat_dist(o["a"], self.theta, flat) < CRASH_WIDTH):
                     alive = False
                     if self.invincible > 0:             # rammed out of the way: scores like a shot
                         self.score += 500

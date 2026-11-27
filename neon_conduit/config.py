@@ -123,6 +123,13 @@ LOCK_RANGE = 60.0       # drones up to this far ahead can be locked on to (near 
 LOCK_ANGLE = 0.14       # ...if a straight shot reaches them within this angle of the sled's
                         # heading, in radians (0.1 is 5.7 deg): the target must be roughly in front
 DRONE_HIT_R = 3.0       # a shot passing this close to a drone's middle (world units) downs it
+# A drone hits the sled when its middle is inside this box round the sled's position (world
+# units): the ship's own size (from 1.5 behind to 4.5 ahead, 1.5 to either side), widened by
+# a drone's size (1 each way). It is 8 long so a drone can't slip through it between two
+# frames, even at top speed (under 4 a frame at 60 fps).
+CRASH_BACK = 2.5        # how far behind...
+CRASH_FRONT = 5.5       # ...and ahead it reaches...
+CRASH_WIDTH = 2.5       # ...and to either side, along the wall
 # The guns and their lock-on can be tuned in a live race with tools/aim_tuner.py, which writes
 # them back here (with AIM_*, BULLET_*, GUN_SPREAD and DRONE_SPEED).
 DRONE_SPEED = 0.5       # drones fly forward at this fraction of top speed
