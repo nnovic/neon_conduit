@@ -130,8 +130,8 @@ DRONE_HIT_R = 3.0       # a shot passing this close to a drone's middle (world u
 CRASH_BACK = 2.5        # how far behind...
 CRASH_FRONT = 5.5       # ...and ahead it reaches...
 CRASH_WIDTH = 2.5       # ...and to either side, along the wall
-# The guns and their lock-on can be tuned in a live race with tools/aim_tuner.py, which writes
-# them back here (with AIM_*, BULLET_*, GUN_SPREAD and DRONE_SPEED).
+# The guns, their lock-on and the crash zone can be tuned on a test bench with
+# tools/aim_tuner.py, which writes them back here (with AIM_*, BULLET_* and GUN_SPREAD).
 DRONE_SPEED = 0.5       # drones fly forward at this fraction of top speed
 RING_DRONES = 12        # the tutorial's ring of drones: this many, evenly round the tube
                         # (closer than a sled's width apart: no way through but to shoot one)
